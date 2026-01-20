@@ -3,78 +3,67 @@ const API_BASE_URL = window.location.origin;
 
 // ========== API 請求封裝 ==========
 const API = {
-    // 通用請求方法
-    async request(endpoint, options = {}) {
-        const url = `${API_BASE_URL}${endpoint}`;
-        
-        const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            ...options
-        };
-        
-        // 添加使用者認證
-        const user = AppState.getUser();
-        if (user) {
-            config.headers['X-User-ID'] = user.id;
-            config.headers['X-Username'] = user.username;
-        }
-        
-        try {
-            const response = await fetch(url, config);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('API 請求失敗:', error);
-            throw error;
-        }
-    },
-    
     // ========== 認證 API ==========
     async login(username, password) {
-        return this.request('/api/login', {
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('password', password);
+        
+        const response = await fetch(`${API_BASE_URL}/api/login`, {
             method: 'POST',
-            body: JSON.stringify({ username, password })
+            body: formData
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     },
     
     async register(username, password) {
-        return this.request('/api/register', {
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('password', password);
+        
+        const response = await fetch(`${API_BASE_URL}/api/register`, {
             method: 'POST',
-            body: JSON.stringify({ username, password })
+            body: formData
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     },
     
     // ========== 天氣 API ==========
     async getWeather(city) {
-        return this.request(`/api/weather?city=${encodeURIComponent(city)}`);
+        const response = await fetch(
+            `${API_BASE_URL}/api/weather?city=${encodeURIComponent(city)}`
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     },
     
     // ========== 上傳 API ==========
     async uploadImages(files) {
         const formData = new FormData();
         
-        files.forEach((file, index) => {
-            formData.append(`file_${index}`, file);
+        files.forEach(file => {
+            formData.append('files', file);
         });
         
         const user = AppState.getUser();
         formData.append('user_id', user.id);
         
-        // 使用 multipart/form-data
         const response = await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
-            headers: {
-                'X-User-ID': user.id,
-                'X-Username': user.username
-            },
             body: formData
         });
         
@@ -88,46 +77,77 @@ const API = {
     // ========== 衣櫥 API ==========
     async getWardrobe() {
         const user = AppState.getUser();
-        return this.request(`/api/wardrobe?user_id=${user.id}`);
+        const response = await fetch(
+            `${API_BASE_URL}/api/wardrobe?user_id=${user.id}`
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     },
     
     async deleteItem(itemId) {
         const user = AppState.getUser();
-        return this.request('/api/wardrobe/delete', {
+        const formData = new FormData();
+        formData.append('user_id', user.id);
+        formData.append('item_id', itemId);
+        
+        const response = await fetch(`${API_BASE_URL}/api/wardrobe/delete`, {
             method: 'POST',
-            body: JSON.stringify({
-                user_id: user.id,
-                item_id: itemId
-            })
+            body: formData
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     },
     
     async batchDeleteItems(itemIds) {
         const user = AppState.getUser();
-        return this.request('/api/wardrobe/batch-delete', {
-            method: 'POST',
-            body: JSON.stringify({
-                user_id: user.id,
-                item_ids: itemIds
-            })
+        const formData = new FormData();
+        formData.append('user_id', user.id);
+        
+        itemIds.forEach(id => {
+            formData.append('item_ids', id);
         });
+        
+        const response = await fetch(`${API_BASE_URL}/api/wardrobe/batch-delete`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     },
     
     // ========== 推薦 API ==========
     async getRecommendation(city, style, occasion) {
         const user = AppState.getUser();
-        return this.request('/api/recommendation', {
+        const formData = new FormData();
+        formData.append('user_id', user.id);
+        formData.append('city', city);
+        formData.append('style', style || '不限定風格');
+        formData.append('occasion', occasion || '外出遊玩');
+        
+        const response = await fetch(`${API_BASE_URL}/api/recommendation`, {
             method: 'POST',
-            body: JSON.stringify({
-                user_id: user.id,
-                city: city,
-                style: style || '不限定風格',
-                occasion: occasion || '外出遊玩'
-            })
+            body: formData
         });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
     }
 };
-
 // ========== 圖片處理工具 ==========
 const ImageUtils = {
     // 壓縮圖片
