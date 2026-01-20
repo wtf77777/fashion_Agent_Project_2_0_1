@@ -92,49 +92,30 @@ class WardrobeService:
             print(f"刪除失敗: {str(e)}")
             return False
     
-    def batch_delete_items(self, user_id: str, item_ids: List[int]) -> Tuple[bool, int, int]:
-        """
-        批次刪除衣物 - 優化版(立即刷新)
+def batch_delete_items(self, user_id: str, item_ids: List[int]) -> Tuple[bool, int, int]:
+    """批次刪除衣物"""
+    if not item_ids:
+        return False, 0, 0
         
-        Returns:
-            (是否成功, 成功數量, 失敗數量)
-        """
-        if not item_ids:
-            return False, 0, 0
-            
-        try:
-            success_count = 0
-            fail_count = 0
-            
-            # 使用進度條顯示刪除進度
-            import streamlit as st
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            total = len(item_ids)
-            for idx, item_id in enumerate(item_ids):
-                try:
-                    self.db.client.table("my_wardrobe")\
-                        .delete()\
-                        .eq("id", item_id)\
-                        .eq("user_id", user_id)\
-                        .execute()
-                    success_count += 1
-                except:
-                    fail_count += 1
-                
-                # 更新進度
-                progress = (idx + 1) / total
-                progress_bar.progress(progress)
-                status_text.text(f"刪除中... {idx + 1}/{total}")
-            
-            progress_bar.empty()
-            status_text.empty()
-            
-            return True, success_count, fail_count
-        except Exception as e:
-            print(f"批次刪除失敗: {str(e)}")
-            return False, 0, 0
+    try:
+        success_count = 0
+        fail_count = 0
+        
+        for item_id in item_ids:
+            try:
+                self.db.client.table("my_wardrobe")\
+                    .delete()\
+                    .eq("id", item_id)\
+                    .eq("user_id", user_id)\
+                    .execute()
+                success_count += 1
+            except:
+                fail_count += 1
+        
+        return True, success_count, fail_count
+    except Exception as e:
+        print(f"批次刪除失敗: {str(e)}")
+        return False, 0, 0
     
     def get_category_statistics(self, user_id: str) -> dict:
         """獲取衣櫥分類統計"""
