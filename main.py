@@ -39,9 +39,6 @@ app.add_middleware(
 
 # ========== 載入配置 ==========
 config = AppConfig.from_env()
-if not config.is_valid():
-    raise RuntimeError("配置不完整,請檢查環境變數")
-
 # ========== 初始化服務 ==========
 supabase_client = SupabaseClient(config.supabase_url, config.supabase_key)
 ai_service = AIService(config.gemini_api_key)
