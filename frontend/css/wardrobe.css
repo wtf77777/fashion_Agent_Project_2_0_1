@@ -1,4 +1,3 @@
-
 /* ========== 衣櫥頁面樣式 ========== */
 
 /* 操作按鈕區 */
@@ -10,6 +9,52 @@
 
 .wardrobe-actions .btn {
     flex: 1;
+}
+
+/* ========== 分類過濾按鈕 (新增) ========== */
+.category-filters-container {
+    margin-bottom: var(--spacing-lg);
+}
+
+.category-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    background: white;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.category-filter-btn {
+    padding: 0.6rem 1.2rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-full);
+    background: white;
+    color: var(--gray-700);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.category-filter-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.category-filter-btn.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.category-filter-btn.active:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 
 /* 統計網格 */
@@ -179,5 +224,14 @@
     
     .item-image {
         height: 200px;
+    }
+    
+    .category-filters {
+        padding: var(--spacing-sm);
+    }
+    
+    .category-filter-btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
     }
 }
