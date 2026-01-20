@@ -18,7 +18,7 @@ class WardrobeService:
         """計算圖片的 SHA256 hash 值"""
         return hashlib.sha256(img_bytes).hexdigest()
     
-    def check_duplicate_image(self, user_id: int, img_hash: str) -> Tuple[bool, Optional[str]]:
+    def check_duplicate_image(self, user_id: str, img_hash: str) -> Tuple[bool, Optional[str]]:
         """
         檢查圖片是否已存在
         
@@ -65,7 +65,7 @@ class WardrobeService:
         except Exception as e:
             return False, str(e)
     
-    def get_wardrobe(self, user_id: int) -> List[ClothingItem]:
+    def get_wardrobe(self, user_id: str) -> List[ClothingItem]:
         """獲取使用者的衣櫥"""
         try:
             response = self.db.client.table("my_wardrobe")\
@@ -79,7 +79,7 @@ class WardrobeService:
             print(f"讀取衣櫥失敗: {str(e)}")
             return []
     
-    def delete_item(self, user_id: int, item_id: int) -> bool:
+    def delete_item(self, user_id: str, item_id: int) -> bool:
         """刪除單件衣物"""
         try:
             self.db.client.table("my_wardrobe")\
@@ -92,7 +92,7 @@ class WardrobeService:
             print(f"刪除失敗: {str(e)}")
             return False
     
-    def batch_delete_items(self, user_id: int, item_ids: List[int]) -> Tuple[bool, int, int]:
+    def batch_delete_items(self, user_id: str, item_ids: List[int]) -> Tuple[bool, int, int]:
         """批次刪除衣物"""
         if not item_ids:
             return False, 0, 0
@@ -117,7 +117,7 @@ class WardrobeService:
             print(f"批次刪除失敗: {str(e)}")
             return False, 0, 0
     
-    def get_category_statistics(self, user_id: int) -> dict:
+    def get_category_statistics(self, user_id: str) -> dict:
         """獲取衣櫥分類統計"""
         items = self.get_wardrobe(user_id)
         
