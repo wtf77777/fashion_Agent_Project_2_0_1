@@ -3,7 +3,6 @@ const WardrobeUI = {
     items: [],
     selectedItems: new Set(),
     isBatchDeleteMode: false,
-    currentCategory: 'all', // 新增：當前選擇的分類
     
     init() {
         this.bindEvents();
@@ -11,22 +10,20 @@ const WardrobeUI = {
     
     bindEvents() {
         // 刷新按鈕
-        document.getElementById('refresh-wardrobe-btn').addEventListener('click', () => {
-            this.loadWardrobe();
-        });
+        const refreshBtn = document.getElementById('refresh-wardrobe-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.loadWardrobe();
+            });
+        }
         
         // 批量刪除按鈕
-        document.getElementById('batch-delete-btn').addEventListener('click', () => {
-            this.toggleBatchDeleteMode();
-        });
-        
-        // 分類過濾按鈕 (會動態生成，使用事件委派)
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('category-filter-btn')) {
-                const category = e.target.dataset.category;
-                this.filterByCategory(category);
-            }
-        });
+        const batchDeleteBtn = document.getElementById('batch-delete-btn');
+        if (batchDeleteBtn) {
+            batchDeleteBtn.addEventListener('click', () => {
+                this.toggleBatchDeleteMode();
+            });
+        }
     },
     
     async loadWardrobe() {
@@ -37,8 +34,6 @@ const WardrobeUI = {
             
             if (result.success) {
                 this.items = result.items || [];
-                this.currentCategory = 'all'; // 重置分類
-                this.renderCategoryFilters(); // 渲染分類按鈕
                 this.renderWardrobe();
                 this.updateStats();
             } else {
@@ -52,78 +47,19 @@ const WardrobeUI = {
         }
     },
     
-    renderCategoryFilters() {
-        // 計算分類統計
-        const categories = {};
-        this.items.forEach(item => {
-            const cat = item.category || '其他';
-            categories[cat] = (categories[cat] || 0) + 1;
-        });
-        
-        // 生成分類過濾按鈕
-        const filtersHTML = `
-            <div class="category-filters">
-                <button class="category-filter-btn ${this.currentCategory === 'all' ? 'active' : ''}" 
-                        data-category="all">
-                    全部 (${this.items.length})
-                </button>
-                ${Object.entries(categories).map(([cat, count]) => `
-                    <button class="category-filter-btn ${this.currentCategory === cat ? 'active' : ''}" 
-                            data-category="${cat}">
-                        ${cat} (${count})
-                    </button>
-                `).join('')}
-            </div>
-        `;
-        
-        // 插入到衣櫥操作區下方
-        const actionsDiv = document.querySelector('.wardrobe-actions');
-        let filtersContainer = document.querySelector('.category-filters-container');
-        
-        if (!filtersContainer) {
-            filtersContainer = document.createElement('div');
-            filtersContainer.className = 'category-filters-container';
-            actionsDiv.after(filtersContainer);
-        }
-        
-        filtersContainer.innerHTML = filtersHTML;
-    },
-    
-    filterByCategory(category) {
-        this.currentCategory = category;
-        this.renderCategoryFilters(); // 更新按鈕樣式
-        this.renderWardrobe();
-    },
-    
-    getFilteredItems() {
-        if (this.currentCategory === 'all') {
-            return this.items;
-        }
-        return this.items.filter(item => item.category === this.currentCategory);
-    },
-    
     renderWardrobe() {
         const grid = document.getElementById('wardrobe-grid');
         const emptyState = document.getElementById('wardrobe-empty');
         
-        const filteredItems = this.getFilteredItems();
+        // 檢查元素是否存在
+        if (!grid || !emptyState) {
+            console.error('找不到衣櫥容器元素');
+            return;
+        }
         
-        if (filteredItems.length === 0) {
+        if (this.items.length === 0) {
             grid.style.display = 'none';
             emptyState.style.display = 'block';
-            
-            if (this.currentCategory !== 'all') {
-                emptyState.innerHTML = `
-                    <p>「${this.currentCategory}」分類中沒有衣服</p>
-                    <button class="btn btn-secondary" onclick="WardrobeUI.filterByCategory('all')">
-                        顯示全部
-                    </button>
-                `;
-            } else {
-                emptyState.innerHTML = `
-                    <p>衣櫥是空的，去上傳一些衣服吧！ 👕</p>
-                `;
-            }
             return;
         }
         
@@ -131,7 +67,7 @@ const WardrobeUI = {
         emptyState.style.display = 'none';
         grid.innerHTML = '';
         
-        filteredItems.forEach(item => {
+        this.items.forEach(item => {
             const card = this.createItemCard(item);
             grid.appendChild(card);
         });
@@ -185,6 +121,12 @@ const WardrobeUI = {
     },
     
     updateStats() {
+        // 更新總計 - 加入安全檢查
+        const totalItemsEl = document.getElementById('total-items');
+        if (totalItemsEl) {
+            totalItemsEl.textContent = this.items.length;
+        }
+        
         // 計算分類統計
         const categories = {};
         this.items.forEach(item => {
@@ -192,28 +134,32 @@ const WardrobeUI = {
             categories[cat] = (categories[cat] || 0) + 1;
         });
         
-        // 更新統計網格
+        // 更新統計網格 - 加入安全檢查
         const statsGrid = document.getElementById('wardrobe-stats');
-        if (statsGrid) {
-            statsGrid.innerHTML = `
-                <div class="stat-card">
-                    <span class="stat-label">總計</span>
-                    <span class="stat-value">${this.items.length}</span>
-                </div>
-                ${Object.entries(categories).map(([cat, count]) => `
-                    <div class="stat-card">
-                        <span class="stat-label">${cat}</span>
-                        <span class="stat-value">${count}</span>
-                    </div>
-                `).join('')}
-            `;
+        if (!statsGrid) {
+            console.error('找不到 wardrobe-stats 元素');
+            return;
         }
+        
+        statsGrid.innerHTML = `
+            <div class="stat-card">
+                <span class="stat-label">總計</span>
+                <span class="stat-value">${this.items.length}</span>
+            </div>
+            ${Object.entries(categories).map(([cat, count]) => `
+                <div class="stat-card">
+                    <span class="stat-label">${cat}</span>
+                    <span class="stat-value">${count}</span>
+                </div>
+            `).join('')}
+        `;
     },
     
     toggleBatchDeleteMode() {
         this.isBatchDeleteMode = !this.isBatchDeleteMode;
         
         const btn = document.getElementById('batch-delete-btn');
+        if (!btn) return;
         
         if (this.isBatchDeleteMode) {
             btn.textContent = '✅ 完成選擇';
@@ -228,7 +174,7 @@ const WardrobeUI = {
             // 如果有選中的項目，執行刪除
             if (this.selectedItems.size > 0) {
                 this.executeBatchDelete();
-                return; // 刪除完成後會重新載入，不需要重新渲染
+                return; // 刪除後會重新載入，不需要再次渲染
             }
         }
         
@@ -245,7 +191,7 @@ const WardrobeUI = {
         
         // 更新按鈕文字
         const btn = document.getElementById('batch-delete-btn');
-        if (btn) { // 🔧 新增檢查
+        if (btn) {
             if (this.selectedItems.size > 0) {
                 btn.textContent = `🗑️ 刪除選中的 ${this.selectedItems.size} 件`;
             } else {
@@ -268,7 +214,6 @@ const WardrobeUI = {
                 Toast.success('✅ 已刪除');
                 // 從列表中移除
                 this.items = this.items.filter(item => item.id !== itemId);
-                this.renderCategoryFilters(); // 更新分類按鈕
                 this.renderWardrobe();
                 this.updateStats();
             } else {
@@ -290,15 +235,6 @@ const WardrobeUI = {
         if (!confirm(`確定要刪除選中的 ${this.selectedItems.size} 件衣服嗎？`)) {
             this.selectedItems.clear();
             this.isBatchDeleteMode = false;
-            
-            // 🔧 安全地更新按鈕
-            const btn = document.getElementById('batch-delete-btn');
-            if (btn) {
-                btn.textContent = '🗑️ 批量刪除';
-                btn.classList.remove('btn-primary');
-                btn.classList.add('btn-secondary');
-            }
-            
             this.renderWardrobe();
             return;
         }
@@ -317,18 +253,9 @@ const WardrobeUI = {
                 }
                 
                 // 重新載入衣櫥
+                await this.loadWardrobe();
                 this.selectedItems.clear();
                 this.isBatchDeleteMode = false;
-                
-                // 🔧 安全地更新按鈕
-                const btn = document.getElementById('batch-delete-btn');
-                if (btn) {
-                    btn.textContent = '🗑️ 批量刪除';
-                    btn.classList.remove('btn-primary');
-                    btn.classList.add('btn-secondary');
-                }
-                
-                await this.loadWardrobe();
             } else {
                 Toast.error('批量刪除失敗');
             }
