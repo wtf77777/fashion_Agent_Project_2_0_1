@@ -6,6 +6,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel  # ✅ 加入這行
 from typing import List
 from pathlib import Path
 import sys
@@ -20,6 +21,12 @@ from api.ai_service import AIService
 from api.weather_service import WeatherService
 from api.wardrobe_service import WardrobeService
 from database.models import ClothingItem
+
+# ========== 資料模型 ========== ✅ 加入這個區塊
+class BatchDeleteRequest(BaseModel):
+    """批量刪除請求模型"""
+    user_id: str
+    item_ids: List[int]
 
 # ========== 初始化 FastAPI ==========
 app = FastAPI(
@@ -39,6 +46,9 @@ app.add_middleware(
 
 # ========== 載入配置 ==========
 config = AppConfig.from_env()
+if not config.is_valid():
+    raise RuntimeError("配置不完整,請檢查環境變數")
+
 # ========== 初始化服務 ==========
 supabase_client = SupabaseClient(config.supabase_url, config.supabase_key)
 ai_service = AIService(config.gemini_api_key)
@@ -192,9 +202,12 @@ async def delete_item(user_id: str = Form(...), item_id: int = Form(...)):
     return {"success": success}
 
 @app.post("/api/wardrobe/batch-delete")
-async def batch_delete(user_id: str = Form(...), item_ids: List[int] = Form(...)):
+async def batch_delete(request: BatchDeleteRequest):  # ✅ 改用 Pydantic 模型
     """批次刪除衣物"""
-    success, success_count, fail_count = wardrobe_service.batch_delete_items(user_id, item_ids)
+    success, success_count, fail_count = wardrobe_service.batch_delete_items(
+        request.user_id, 
+        request.item_ids
+    )
     return {
         "success": success,
         "success_count": success_count,
