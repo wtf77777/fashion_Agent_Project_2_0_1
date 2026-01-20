@@ -3,7 +3,6 @@
 統一管理所有配置，支援環境變數和 Streamlit Secrets
 """
 import os
-import streamlit as st
 from dataclasses import dataclass
 from typing import Optional
 
@@ -18,20 +17,6 @@ class AppConfig:
     api_rate_limit_seconds: int = 15
     max_batch_upload: int = 10
     weather_cache_hours: int = 1
-    
-    @classmethod
-    def from_secrets(cls) -> Optional['AppConfig']:
-        """從 Streamlit Secrets 載入配置"""
-        try:
-            return cls(
-                gemini_api_key=st.secrets.get("GEMINI_KEY", ""),
-                weather_api_key=st.secrets.get("WEATHER_KEY", ""),
-                supabase_url=st.secrets.get("SUPABASE_URL", ""),
-                supabase_key=st.secrets.get("SUPABASE_KEY", ""),
-                default_city=st.secrets.get("DEFAULT_CITY", "Taipei")
-            )
-        except Exception:
-            return None
     
     @classmethod
     def from_env(cls) -> 'AppConfig':
