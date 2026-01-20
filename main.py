@@ -119,7 +119,7 @@ async def get_weather(city: str = "Taipei"):
 @app.post("/api/upload")
 async def upload_images(
     files: List[UploadFile] = File(...),
-    user_id: str = Form(...)
+    user_id: int = Form(...)
 ):
     """批次上傳圖片並進行 AI 辨識"""
     try:
@@ -177,7 +177,7 @@ async def upload_images(
 
 # ========== 衣櫥 API ==========
 @app.get("/api/wardrobe")
-async def get_wardrobe(user_id: str):
+async def get_wardrobe(user_id: int):
     """獲取使用者衣櫥"""
     items = wardrobe_service.get_wardrobe(user_id)
     return {
@@ -186,13 +186,13 @@ async def get_wardrobe(user_id: str):
     }
 
 @app.post("/api/wardrobe/delete")
-async def delete_item(user_id: str = Form(...), item_id: int = Form(...)):
+async def delete_item(user_id: int = Form(...), item_id: int = Form(...)):
     """刪除單件衣物"""
     success = wardrobe_service.delete_item(user_id, item_id)
     return {"success": success}
 
 @app.post("/api/wardrobe/batch-delete")
-async def batch_delete(user_id: str = Form(...), item_ids: List[int] = Form(...)):
+async def batch_delete(user_id: int = Form(...), item_ids: List[int] = Form(...)):
     """批次刪除衣物"""
     success, success_count, fail_count = wardrobe_service.batch_delete_items(user_id, item_ids)
     return {
@@ -204,7 +204,7 @@ async def batch_delete(user_id: str = Form(...), item_ids: List[int] = Form(...)
 # ========== 推薦 API ==========
 @app.post("/api/recommendation")
 async def get_recommendation(
-    user_id: str = Form(...),
+    user_id: int = Form(...),
     city: str = Form(...),
     style: str = Form(""),
     occasion: str = Form("外出遊玩")
