@@ -1,259 +1,303 @@
-"""
-FastAPI 後端 - 取代 Streamlit
-部署到 Render 的主程式
-"""
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel  # ✅ 加入這行
-from typing import List
-from pathlib import Path
-import sys
-import os
+// ========== API 配置 ==========
+const API_BASE_URL = window.location.origin;
 
-# 添加 backend 到路徑
-sys.path.insert(0, str(Path(__file__).parent / 'backend'))
-
-from config import AppConfig
-from database.supabase_client import SupabaseClient
-from api.ai_service import AIService
-from api.weather_service import WeatherService
-from api.wardrobe_service import WardrobeService
-from database.models import ClothingItem
-
-# ========== 資料模型 ========== ✅ 加入這個區塊
-class BatchDeleteRequest(BaseModel):
-    """批量刪除請求模型"""
-    user_id: str
-    item_ids: List[int]
-
-# ========== 初始化 FastAPI ==========
-app = FastAPI(
-    title="AI Fashion Assistant API",
-    description="AI 智慧衣櫥管理系統",
-    version="2.0.0"
-)
-
-# ========== CORS 設定 ==========
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ========== 載入配置 ==========
-config = AppConfig.from_env()
-if not config.is_valid():
-    raise RuntimeError("配置不完整,請檢查環境變數")
-
-# ========== 初始化服務 ==========
-supabase_client = SupabaseClient(config.supabase_url, config.supabase_key)
-ai_service = AIService(config.gemini_api_key)
-weather_service = WeatherService(config.weather_api_key)
-wardrobe_service = WardrobeService(supabase_client)
-
-# ========== 掛載靜態文件 ==========
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
-
-# ========== 根路由 ==========
-@app.get("/")
-async def read_root():
-    """返回前端 HTML 頁面"""
-    return FileResponse("frontend/index.html")
-
-# ========== 健康檢查 ==========
-@app.get("/health")
-async def health_check():
-    """Render 健康檢查"""
-    db_ok = supabase_client.test_connection()
-    return {
-        "status": "healthy",
-        "database": "connected" if db_ok else "disconnected"
-    }
-
-# ========== 認證 API ==========
-@app.post("/api/login")
-async def login(username: str = Form(...), password: str = Form(...)):
-    """使用者登入"""
-    try:
-        result = supabase_client.client.table("users")\
-            .select("*")\
-            .eq("username", username)\
-            .eq("password", password)\
-            .execute()
+// ========== API 請求封裝 ==========
+const API = {
+    // ========== 認證 API ==========
+    async login(username, password) {
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('password', password);
         
-        if result.data:
-            return {
-                "success": True,
-                "user_id": result.data[0]['id'],
-                "username": username
+        const response = await fetch(`${API_BASE_URL}/api/login`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    },
+    
+    async register(username, password) {
+        const formData = new FormData();
+        formData.append('username', username);
+        formData.append('password', password);
+        
+        const response = await fetch(`${API_BASE_URL}/api/register`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    },
+    
+    // ========== 天氣 API ==========
+    async getWeather(city) {
+        const response = await fetch(
+            `${API_BASE_URL}/api/weather?city=${encodeURIComponent(city)}`
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    },
+    
+    // ========== 上傳 API ==========
+    async uploadImages(files) {
+        const formData = new FormData();
+        
+        files.forEach(file => {
+            formData.append('files', file);
+        });
+        
+        const user = AppState.getUser();
+        formData.append('user_id', user.id);
+        
+        const response = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`上傳失敗: ${response.statusText}`);
+        }
+        
+        return response.json();
+    },
+    
+    // ========== 衣櫥 API ==========
+    async getWardrobe() {
+        const user = AppState.getUser();
+        const response = await fetch(
+            `${API_BASE_URL}/api/wardrobe?user_id=${user.id}`
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    },
+    
+    async deleteItem(itemId) {
+        const user = AppState.getUser();
+        const formData = new FormData();
+        formData.append('user_id', user.id);
+        formData.append('item_id', itemId);
+        
+        const response = await fetch(`${API_BASE_URL}/api/wardrobe/delete`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    },
+    
+    async batchDeleteItems(itemIds) {
+        const user = AppState.getUser();
+        
+        // ✅ 改用 JSON Body
+        const response = await fetch(`${API_BASE_URL}/api/wardrobe/batch-delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: user.id,
+                item_ids: itemIds
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    },
+    
+    // ========== 推薦 API ==========
+    async getRecommendation(city, style, occasion) {
+        const user = AppState.getUser();
+        const formData = new FormData();
+        formData.append('user_id', user.id);
+        formData.append('city', city);
+        formData.append('style', style || '不限定風格');
+        formData.append('occasion', occasion || '外出遊玩');
+        
+        const response = await fetch(`${API_BASE_URL}/api/recommendation`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    }
+};
+
+// ========== 圖片處理工具 ==========
+const ImageUtils = {
+    async compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const img = new Image();
+                
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = height * (maxWidth / width);
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = width * (maxHeight / height);
+                            height = maxHeight;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    canvas.toBlob((blob) => {
+                        resolve(new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        }));
+                    }, 'image/jpeg', quality);
+                };
+                
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    },
+    
+    createPreviewURL(file) {
+        return URL.createObjectURL(file);
+    },
+    
+    revokePreviewURL(url) {
+        URL.revokeObjectURL(url);
+    },
+    
+    validateImageFile(file) {
+        const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        const maxSize = 10 * 1024 * 1024;
+        
+        if (!validTypes.includes(file.type)) {
+            throw new Error(`不支援的檔案類型: ${file.type}`);
+        }
+        
+        if (file.size > maxSize) {
+            throw new Error(`檔案過大: ${(file.size / 1024 / 1024).toFixed(2)}MB (最大 10MB)`);
+        }
+        
+        return true;
+    }
+};
+
+// ========== 本地儲存工具 ==========
+const Storage = {
+    set(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (error) {
+            console.error('儲存失敗:', error);
+        }
+    },
+    
+    get(key) {
+        try {
+            const value = localStorage.getItem(key);
+            return value ? JSON.parse(value) : null;
+        } catch (error) {
+            console.error('讀取失敗:', error);
+            return null;
+        }
+    },
+    
+    remove(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (error) {
+            console.error('刪除失敗:', error);
+        }
+    },
+    
+    clear() {
+        try {
+            localStorage.clear();
+        } catch (error) {
+            console.error('清空失敗:', error);
+        }
+    }
+};
+
+// ========== 防抖和節流工具 ==========
+const Utils = {
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+    
+    throttle(func, limit) {
+        let inThrottle;
+        return function(...args) {
+            if (!inThrottle) {
+                func.apply(this, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
             }
-        else:
-            return {"success": False, "message": "帳號或密碼錯誤"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/register")
-async def register(username: str = Form(...), password: str = Form(...)):
-    """使用者註冊"""
-    try:
-        existing = supabase_client.client.table("users")\
-            .select("id")\
-            .eq("username", username)\
-            .execute()
-        
-        if existing.data:
-            return {"success": False, "message": "使用者名稱已存在"}
-        
-        result = supabase_client.client.table("users")\
-            .insert({"username": username, "password": password})\
-            .execute()
-        
-        return {"success": True, "message": "註冊成功"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ========== 天氣 API ==========
-@app.get("/api/weather")
-async def get_weather(city: str = "Taipei"):
-    """獲取天氣資料"""
-    weather = weather_service.get_weather(city)
-    if weather:
-        return weather.to_dict()
-    raise HTTPException(status_code=404, detail="無法獲取天氣資料")
-
-# ========== 上傳 API ==========
-@app.post("/api/upload")
-async def upload_images(
-    files: List[UploadFile] = File(...),
-    user_id: str = Form(...)
-):
-    """批次上傳圖片並進行 AI 辨識"""
-    try:
-        img_bytes_list = []
-        file_names = []
-        
-        for file in files:
-            content = await file.read()
-            img_bytes_list.append(content)
-            file_names.append(file.filename)
-        
-        tags_list = ai_service.batch_auto_tag(img_bytes_list)
-        
-        if not tags_list:
-            return {"success": False, "message": "AI 辨識失敗"}
-        
-        success_items = []
-        duplicate_count = 0
-        fail_count = 0
-        
-        for img_bytes, tags, filename in zip(img_bytes_list, tags_list, file_names):
-            img_hash = wardrobe_service.get_image_hash(img_bytes)
-            is_duplicate, _ = wardrobe_service.check_duplicate_image(user_id, img_hash)
-            
-            if is_duplicate:
-                duplicate_count += 1
-                continue
-            
-            item = ClothingItem(
-                user_id=user_id,
-                name=tags.get('name', filename),
-                category=tags.get('category', '其他'),
-                color=tags.get('color', '未知'),
-                style=tags.get('style', ''),
-                warmth=tags.get('warmth', 5)
-            )
-            
-            success, msg = wardrobe_service.save_item(item, img_bytes)
-            
-            if success:
-                success_items.append(tags)
-            else:
-                fail_count += 1
-        
-        return {
-            "success": True,
-            "success_count": len(success_items),
-            "duplicate_count": duplicate_count,
-            "fail_count": fail_count,
-            "items": success_items
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ========== 衣櫥 API ==========
-@app.get("/api/wardrobe")
-async def get_wardrobe(user_id: str):
-    """獲取使用者衣櫥"""
-    items = wardrobe_service.get_wardrobe(user_id)
-    return {
-        "success": True,
-        "items": [item.to_dict() for item in items]
+        };
+    },
+    
+    formatDate(date) {
+        return new Date(date).toLocaleDateString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    },
+    
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
     }
-
-@app.post("/api/wardrobe/delete")
-async def delete_item(user_id: str = Form(...), item_id: int = Form(...)):
-    """刪除單件衣物"""
-    success = wardrobe_service.delete_item(user_id, item_id)
-    return {"success": success}
-
-@app.post("/api/wardrobe/batch-delete")
-async def batch_delete(request: BatchDeleteRequest):  # ✅ 改用 Pydantic 模型
-    """批次刪除衣物"""
-    success, success_count, fail_count = wardrobe_service.batch_delete_items(
-        request.user_id, 
-        request.item_ids
-    )
-    return {
-        "success": success,
-        "success_count": success_count,
-        "fail_count": fail_count
-    }
-
-# ========== 推薦 API ==========
-@app.post("/api/recommendation")
-async def get_recommendation(
-    user_id: str = Form(...),
-    city: str = Form(...),
-    style: str = Form(""),
-    occasion: str = Form("外出遊玩")
-):
-    """獲取穿搭推薦"""
-    try:
-        wardrobe = wardrobe_service.get_wardrobe(user_id)
-        
-        if not wardrobe:
-            return {"success": False, "message": "衣櫥是空的,請先上傳衣服"}
-        
-        weather = weather_service.get_weather(city)
-        
-        if not weather:
-            return {"success": False, "message": "無法獲取天氣資料"}
-        
-        recommendation = ai_service.generate_outfit_recommendation(
-            wardrobe, weather, style, occasion
-        )
-        
-        if not recommendation:
-            return {"success": False, "message": "AI 推薦生成失敗"}
-        
-        recommended_items = ai_service.parse_recommended_items(recommendation, wardrobe)
-        
-        return {
-            "success": True,
-            "recommendation": recommendation,
-            "items": [item.to_dict() for item in recommended_items]
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ========== 啟動 ==========
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+};
