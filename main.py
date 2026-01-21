@@ -70,37 +70,61 @@ async def health_check():
 
 @app.post("/api/login")
 async def login(username: str = Form(...), password: str = Form(...)):
-    """✅ 使用者登入 - 返回 UUID"""
+    """✅ 使用者登入 - 修復版本"""
     try:
         print(f"[INFO] 登入嘗試: {username}")
         
+        # 查詢用戶
         result = supabase_client.client.table("users")\
             .select("*")\
             .eq("username", username)\
             .eq("password", password)\
             .execute()
         
-        if result.data and len(result.data) > 0:
-            user_id = result.data[0]['id']  # ✅ UUID
+        # ✅ 安全的檢查：只檢查是否不為空
+        if result.data:
+            user_id = result.data[0]['id']
             print(f"[INFO] 登入成功: {username} (ID: {user_id})")
             
             return {
                 "success": True,
-                "user_id": user_id,  # ✅ UUID 字串
+                "user_id": str(user_id),  # ✅ 確保返回字串
                 "username": username
             }
         else:
             print(f"[WARNING] 登入失敗: {username} - 帳號或密碼錯誤")
-            return {"success": False, "message": "帳號或密碼錯誤"}
+            return {
+                "success": False,
+                "message": "帳號或密碼錯誤"
+            }
+            
     except Exception as e:
         print(f"[ERROR] 登入異常: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # ✅ 返回錯誤響應，而不是拋出異常
+        return {
+            "success": False,
+            "message": f"登入失敗: {str(e)}"
+        }
+
 
 @app.post("/api/register")
 async def register(username: str = Form(...), password: str = Form(...)):
-    """✅ 使用者註冊 - 讓 Supabase 自動生成 UUID"""
+    """✅ 使用者註冊 - 修復版本"""
     try:
         print(f"[INFO] 註冊嘗試: {username}")
+        
+        # ✅ 驗證輸入
+        if not username or not password:
+            return {
+                "success": False,
+                "message": "使用者名稱和密碼不能為空"
+            }
+        
+        if len(password) < 6:
+            return {
+                "success": False,
+                "message": "密碼至少需要 6 個字元"
+            }
         
         # 檢查使用者是否已存在
         existing = supabase_client.client.table("users")\
@@ -108,30 +132,47 @@ async def register(username: str = Form(...), password: str = Form(...)):
             .eq("username", username)\
             .execute()
         
-        if existing.data and len(existing.data) > 0:
-            print(f"[WARNING] 註冊失敗: {username} - 使用者名稱已存在")
-            return {"success": False, "message": "使用者名稱已存在"}
+        # ✅ 安全的檢查
+        if existing.data:
+            print(f"[WARNING] 使用者已存在: {username}")
+            return {
+                "success": False,
+                "message": "使用者名稱已存在"
+            }
         
-        # ✅ 讓 Supabase 自動生成 UUID，不要手動提供
+        # 插入新用戶
+        # ✅ 重要：不提供 id，讓 Supabase 自動生成 UUID
         result = supabase_client.client.table("users")\
             .insert({
                 "username": username,
                 "password": password
-                # ❌ 不提供 id，讓資料庫自動生成
             })\
             .execute()
         
-        if result.data and len(result.data) > 0:
+        # ✅ 安全的檢查
+        if result.data:
             new_user_id = result.data[0]['id']
             print(f"[INFO] 註冊成功: {username} (ID: {new_user_id})")
-            return {"success": True, "message": "註冊成功"}
+            
+            return {
+                "success": True,
+                "message": "註冊成功"
+            }
         else:
-            print(f"[WARNING] 註冊失敗: {username} - 資料庫插入失敗")
-            return {"success": False, "message": "註冊失敗"}
+            # 如果 data 為空，檢查是否有錯誤
+            print(f"[WARNING] 插入返回空結果: {result}")
+            return {
+                "success": False,
+                "message": "註冊失敗，請稍後重試"
+            }
             
     except Exception as e:
         print(f"[ERROR] 註冊異常: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # ✅ 返回錯誤響應，而不是拋出 HTTPException（會導致 503）
+        return {
+            "success": False,
+            "message": f"註冊失敗: {str(e)}"
+        }
 
 # ========== 天氣 API ==========
 @app.get("/api/weather")
