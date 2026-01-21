@@ -62,36 +62,36 @@ class AIService:
 """
             
             content_parts = [prompt]
-        for img_bytes in img_bytes_list:
-            content_parts.append({
-                "mime_type": "image/jpeg",
-                "data": img_bytes
-            })
-        
-        print(f"[INFO] 呼叫 Gemini API...")
-        response = self.model.generate_content(content_parts)
-        
-        # 🔍 印出原始回應
-        print(f"[DEBUG] AI 原始回應: {response.text[:200]}...")
-        
-        # 清理回應
-        clean_text = response.text.strip()
-        clean_text = clean_text.replace('```json', '').replace('```', '').strip()
-        
-        print(f"[DEBUG] 清理後: {clean_text[:200]}...")
-        
-        tags_list = json.loads(clean_text)
-        
-        print(f"[SUCCESS] AI 辨識成功: {len(tags_list)} 件")
-        return tags_list
-        
-    except json.JSONDecodeError as e:
-        print(f"[ERROR] JSON 解析錯誤: {str(e)}")
-        print(f"[ERROR] 原始回應: {response.text}")  # ⬅️ 印出完整回應
-        return None
-    except Exception as e:
-        print(f"[ERROR] AI 辨識失敗: {str(e)}")
-        return None
+            for img_bytes in img_bytes_list:
+                content_parts.append({
+                    "mime_type": "image/jpeg",
+                    "data": img_bytes
+                })
+            
+            print(f"[INFO] 呼叫 Gemini API...")
+            response = self.model.generate_content(content_parts)
+            
+            # 🔍 印出原始回應
+            print(f"[DEBUG] AI 原始回應: {response.text[:200]}...")
+            
+            # 清理回應
+            clean_text = response.text.strip()
+            clean_text = clean_text.replace('```json', '').replace('```', '').strip()
+            
+            print(f"[DEBUG] 清理後: {clean_text[:200]}...")
+            
+            tags_list = json.loads(clean_text)
+            
+            print(f"[SUCCESS] AI 辨識成功: {len(tags_list)} 件")
+            return tags_list
+            
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] JSON 解析錯誤: {str(e)}")
+            print(f"[ERROR] 原始回應: {response.text}")  # ⬅️ 印出完整回應
+            return None
+        except Exception as e:
+            print(f"[ERROR] AI 辨識失敗: {str(e)}")
+            return None
     
     def generate_outfit_recommendation(
         self, 
