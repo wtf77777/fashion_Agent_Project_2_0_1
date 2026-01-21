@@ -1,10 +1,10 @@
 """
-資料模型定義
-定義所有資料結構，確保類型安全
+資料模型定義 - 更新 UUID 支援
 """
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
+import uuid
 
 @dataclass
 class ClothingItem:
@@ -17,7 +17,8 @@ class ClothingItem:
     warmth: int = 5
     image_data: Optional[str] = None
     image_hash: Optional[str] = None
-    user_id: Optional[str] = None
+    image_url: Optional[str] = None
+    user_id: Optional[str] = None  # ✅ 改為字串（UUID）
     created_at: Optional[datetime] = None
     
     def to_dict(self) -> dict:
@@ -30,6 +31,7 @@ class ClothingItem:
             "warmth": self.warmth,
             "image_data": self.image_data,
             "image_hash": self.image_hash,
+            "image_url": self.image_url,
             "user_id": self.user_id,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
@@ -46,7 +48,8 @@ class ClothingItem:
             warmth=data.get("warmth", 5),
             image_data=data.get("image_data"),
             image_hash=data.get("image_hash"),
-            user_id=data.get("user_id"),
+            image_url=data.get("image_url"),
+            user_id=data.get("user_id"),  # ✅ UUID 字串
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
         )
 
@@ -70,7 +73,7 @@ class WeatherData:
 @dataclass
 class User:
     """使用者資料模型"""
-    id: Optional[str] = None
+    id: Optional[str] = None  # ✅ UUID 字串
     username: str = ""
     password: str = ""  # 實際應用應使用加密
     created_at: Optional[datetime] = None
