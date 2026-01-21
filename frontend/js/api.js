@@ -60,7 +60,10 @@ const API = {
         });
         
         const user = AppState.getUser();
+        // ✅ 改這裡：傳送 UUID 而不是 BIGINT
         formData.append('user_id', user.id);
+        
+        console.log(`[INFO] 上傳: user_id=${user.id}`);
         
         const response = await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
@@ -77,8 +80,16 @@ const API = {
     // ========== 衣櫥 API ==========
     async getWardrobe() {
         const user = AppState.getUser();
+        
+        // ✅ 改這裡：驗證 user_id 存在
+        if (!user || !user.id) {
+            throw new Error('未登入或 user_id 無效');
+        }
+        
+        console.log(`[INFO] 查詢衣櫥: user_id=${user.id}`);
+        
         const response = await fetch(
-            `${API_BASE_URL}/api/wardrobe?user_id=${user.id}`
+            `${API_BASE_URL}/api/wardrobe?user_id=${encodeURIComponent(user.id)}`  // ✅ encodeURIComponent
         );
         
         if (!response.ok) {
@@ -111,6 +122,7 @@ const API = {
         const formData = new FormData();
         formData.append('user_id', user.id);
         
+        // ✅ 改這裡：正確的陣列格式
         itemIds.forEach(id => {
             formData.append('item_ids', id);
         });
@@ -130,6 +142,12 @@ const API = {
     // ========== 推薦 API ==========
     async getRecommendation(city, style, occasion) {
         const user = AppState.getUser();
+        
+        // ✅ 改這裡：驗證 user_id
+        if (!user || !user.id) {
+            throw new Error('未登入');
+        }
+        
         const formData = new FormData();
         formData.append('user_id', user.id);
         formData.append('city', city);
@@ -148,6 +166,7 @@ const API = {
         return response.json();
     }
 };
+
 // ========== 圖片處理工具 ==========
 const ImageUtils = {
     // 壓縮圖片
