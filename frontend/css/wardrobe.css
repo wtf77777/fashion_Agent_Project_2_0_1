@@ -162,6 +162,51 @@
     font-size: 1.2rem;
     margin: var(--spacing-md) 0;
 }
+/* ========== 分類篩選按鈕 ========== */
+.category-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.category-filter-btn {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid var(--gray-300);
+    background: white;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.category-filter-btn:hover {
+    border-color: var(--primary-color);
+    background: var(--gray-50);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.category-filter-btn.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+}
+
+.category-filter-btn.active:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
 
 /* 響應式設計 */
 @media (max-width: 768px) {
@@ -179,5 +224,16 @@
     
     .item-image {
         height: 200px;
+    }
+    .category-filters {
+        padding: var(--spacing-sm);
+    }
+    
+    .category-filter-btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        flex: 1 1 calc(50% - var(--spacing-xs));
+        min-width: 120px;
+        justify-content: center;
     }
 }
