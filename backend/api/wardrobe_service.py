@@ -40,17 +40,13 @@ class WardrobeService:
             return False, None
     
     def save_item(self, item: ClothingItem, img_bytes: bytes) -> Tuple[bool, str]:
-        """
-        儲存衣物到資料庫
-        
-        Args:
-            item: 衣物資料模型
-            img_bytes: 圖片 bytes
-            
-        Returns:
-            (是否成功, 結果訊息)
-        """
+        """儲存衣物到資料庫 - 新增詳細日誌"""
         try:
+            print(f"[DEBUG] === 開始儲存衣物 ===")
+            print(f"[DEBUG] user_id: {item.user_id} (type: {type(item.user_id)})")
+            print(f"[DEBUG] name: {item.name}")
+            print(f"[DEBUG] category: {item.category}")
+            
             img_base64 = base64.b64encode(img_bytes).decode('utf-8')
             img_hash = self.get_image_hash(img_bytes)
             
@@ -58,39 +54,41 @@ class WardrobeService:
             item.image_hash = img_hash
             item.created_at = datetime.now()
             
+            # 準備資料
             data = item.to_dict()
+            print(f"[DEBUG] 準備寫入的資料 keys: {list(data.keys())}")
+            print(f"[DEBUG] user_id 在 dict 中: {data.get('user_id')}")
+            
+            # 執行寫入
+            print(f"[DEBUG] 執行 Supabase INSERT...")
             result = self.db.client.table("my_wardrobe").insert(data).execute()
             
-            return True, "儲存成功"
-        except Exception as e:
-            return False, str(e)
-    
-    def get_wardrobe(self, user_id: str) -> List[ClothingItem]:
-        """獲取使用者的衣櫥"""
-        try:
-            response = self.db.client.table("my_wardrobe")\
-                .select("*")\
-                .eq("user_id", user_id)\
-                .order("created_at", desc=True)\
-                .execute()
+            # 檢查結果
+            print(f"[DEBUG] INSERT 結果: {result}")
             
-            return [ClothingItem.from_dict(item) for item in response.data]
+            if result.data:
+                inserted_id = result.data[0].get('id', 'unknown')
+                print(f"[SUCCESS] ✅ 衣物已儲存 ID: {inserted_id}")
+                return True, "儲存成功"
+            else:
+                print(f"[ERROR] ❌ INSERT 返回空 data")
+                return False, "寫入失敗: result.data 為空"
+            
         except Exception as e:
-            print(f"讀取衣櫥失敗: {str(e)}")
-            return []
-    
-    def delete_item(self, user_id: str, item_id: int) -> bool:
-        """刪除單件衣物"""
-        try:
-            self.db.client.table("my_wardrobe")\
-                .delete()\
-                .eq("id", item_id)\
-                .eq("user_id", user_id)\
-                .execute()
-            return True
-        except Exception as e:
-            print(f"刪除失敗: {str(e)}")
-            return False
+            print(f"[ERROR] ❌ 儲存衣物異常:")
+            print(f"  錯誤類型: {type(e).__name__}")
+            print(f"  錯誤訊息: {str(e)}")
+            
+            # 檢查是否是 Supabase 錯誤
+            if hasattr(e, 'message'):
+                print(f"  Supabase 錯誤: {e.message}")
+            if hasattr(e, 'details'):
+                print(f"  錯誤詳情: {e.details}")
+                
+            import traceback
+            print(f"[TRACE] {traceback.format_exc()}")
+            
+            return False, f"{type(e).__name__}: {str(e)}"
     
     def batch_delete_items(self, user_id: str, item_ids: List[int]) -> Tuple[bool, int, int]:
         """批次刪除衣物"""
