@@ -1,8 +1,9 @@
-// ========== 衣櫥頁面 UI 邏輯 - 正確順序版本 ==========
+// ========== 衣櫥頁面 UI 邏輯 - 新增分類篩選功能 ==========
 const WardrobeUI = {
     items: [],
     selectedItems: new Set(),
     isBatchDeleteMode: false,
+    currentCategory: 'all',  // ✨ 新增：當前選擇的分類
     
     // ========== 初始化 ==========
     init() {
@@ -30,33 +31,93 @@ const WardrobeUI = {
         });
     },
     
-    // ========== 輔助函數 - 放在最前面 ==========
+    // ========== 輔助函數 ==========
     
     escapeHtml(text) {
-        /**防止 XSS 攻擊*/
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     },
     
-    /**✅ 安全版本的 updateStats - 必須放在 loadWardrobe 之前*/
+    /**✨ 新增：獲取所有分類*/
+    getAllCategories() {
+        const categories = new Set(['all']);  // 預設加上「全部」
+        this.items.forEach(item => {
+            if (item.category) {
+                categories.add(item.category);
+            }
+        });
+        return Array.from(categories);
+    },
+    
+    /**✨ 新增：渲染分類篩選按鈕*/
+    renderCategoryFilters() {
+        const filterContainer = document.getElementById('category-filters');
+        if (!filterContainer) {
+            console.warn('⚠️ category-filters 元素不存在');
+            return;
+        }
+        
+        const categories = this.getAllCategories();
+        
+        // 分類圖標映射
+        const categoryIcons = {
+            'all': '📦',
+            '上衣': '👕',
+            '下身': '👖',
+            '外套': '🧥',
+            '鞋子': '👟',
+            '配件': '🎒'
+        };
+        
+        filterContainer.innerHTML = categories.map(cat => {
+            const icon = categoryIcons[cat] || '👔';
+            const displayName = cat === 'all' ? '全部' : cat;
+            const isActive = this.currentCategory === cat;
+            
+            return `
+                <button class="category-filter-btn ${isActive ? 'active' : ''}"
+                        onclick="WardrobeUI.filterByCategory('${cat}')"
+                        data-category="${cat}">
+                    ${icon} ${displayName}
+                </button>
+            `;
+        }).join('');
+        
+        console.log(`🎨 已渲染 ${categories.length} 個分類篩選`);
+    },
+    
+    /**✨ 新增：切換分類篩選*/
+    filterByCategory(category) {
+        console.log(`🔍 篩選分類: ${category}`);
+        this.currentCategory = category;
+        this.renderCategoryFilters();  // 更新按鈕狀態
+        this.renderWardrobe();  // 重新渲染衣櫥
+    },
+    
+    /**✨ 修改：根據當前分類篩選衣物*/
+    getFilteredItems() {
+        if (this.currentCategory === 'all') {
+            return this.items;
+        }
+        return this.items.filter(item => item.category === this.currentCategory);
+    },
+    
     updateStatsSafely() {
         const totalItemsEl = document.getElementById('total-items');
         const statsGridEl = document.getElementById('wardrobe-stats');
         
-        if (!totalItemsEl) {
-            console.warn('⚠️ total-items 元素不存在');
-            return;
-        }
-        
-        if (!statsGridEl) {
-            console.warn('⚠️ wardrobe-stats 元素不存在');
+        if (!totalItemsEl || !statsGridEl) {
+            console.warn('⚠️ 統計元素不存在');
             return;
         }
         
         try {
-            totalItemsEl.textContent = this.items.length;
+            // ✨ 修改：顯示篩選後的數量
+            const filteredItems = this.getFilteredItems();
+            totalItemsEl.textContent = filteredItems.length;
             
+            // 計算所有分類統計（不受篩選影響）
             const categories = {};
             this.items.forEach(item => {
                 const cat = item.category || '其他';
@@ -82,7 +143,7 @@ const WardrobeUI = {
         }
     },
     
-    // ========== 主要邏輯 - 在輔助函數之後 ==========
+    // ========== 主要邏輯 ==========
     
     async loadWardrobe() {
         AppState.setLoading(true);
@@ -104,9 +165,9 @@ const WardrobeUI = {
                     return;
                 }
                 
+                // ✨ 新增：渲染分類篩選
+                this.renderCategoryFilters();
                 this.renderWardrobe();
-                
-                // ✅ 現在 updateStatsSafely 已經定義了
                 this.updateStatsSafely();
                 
                 Toast.success(`✅ 已載入 ${this.items.length} 件衣服`);
@@ -142,10 +203,23 @@ const WardrobeUI = {
             return;
         }
         
-        if (this.items.length === 0) {
+        // ✨ 修改：使用篩選後的項目
+        const filteredItems = this.getFilteredItems();
+        
+        if (filteredItems.length === 0) {
             grid.style.display = 'none';
             emptyState.style.display = 'block';
-            console.log('📭 衣櫥為空');
+            
+            // ✨ 新增：根據篩選狀態顯示不同訊息
+            if (this.currentCategory === 'all') {
+                emptyState.innerHTML = '<p>📭 衣櫥為空，去上傳一些衣服吧！ 👕</p>';
+            } else {
+                const categoryIcons = {'上衣': '👕', '下身': '👖', '外套': '🧥', '鞋子': '👟', '配件': '🎒'};
+                const icon = categoryIcons[this.currentCategory] || '👔';
+                emptyState.innerHTML = `<p>${icon} 此分類沒有衣服</p>`;
+            }
+            
+            console.log(`📭 ${this.currentCategory === 'all' ? '衣櫥為空' : '此分類為空'}`);
             return;
         }
         
@@ -153,9 +227,9 @@ const WardrobeUI = {
         emptyState.style.display = 'none';
         grid.innerHTML = '';
         
-        console.log(`🎨 正在渲染 ${this.items.length} 件衣物...`);
+        console.log(`🎨 正在渲染 ${filteredItems.length} 件衣物 (分類: ${this.currentCategory})...`);
         
-        this.items.forEach((item, index) => {
+        filteredItems.forEach((item, index) => {
             try {
                 const card = this.createItemCard(item);
                 grid.appendChild(card);
@@ -290,6 +364,7 @@ const WardrobeUI = {
             if (result.success) {
                 Toast.success('✅ 已刪除');
                 this.items = this.items.filter(item => item.id !== itemId);
+                this.renderCategoryFilters();  // ✨ 更新分類按鈕
                 this.renderWardrobe();
                 this.updateStatsSafely();
             } else {
