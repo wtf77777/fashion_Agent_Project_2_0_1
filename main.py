@@ -1,6 +1,5 @@
 """
-FastAPI 後端 - 取代 Streamlit
-部署到 Render 的主程式
+FastAPI 後端 - 使用 UUID 認證
 """
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +9,7 @@ from typing import List
 from pathlib import Path
 import sys
 import os
+import uuid
 
 # 添加 backend 到路徑
 sys.path.insert(0, str(Path(__file__).parent / 'backend'))
@@ -39,6 +39,7 @@ app.add_middleware(
 
 # ========== 載入配置 ==========
 config = AppConfig.from_env()
+
 # ========== 初始化服務 ==========
 supabase_client = SupabaseClient(config.supabase_url, config.supabase_key)
 ai_service = AIService(config.gemini_api_key)
@@ -64,11 +65,14 @@ async def health_check():
         "database": "connected" if db_ok else "disconnected"
     }
 
-# ========== 認證 API ==========
+# ========== 認證 API - 更新版本 ==========
+
 @app.post("/api/login")
 async def login(username: str = Form(...), password: str = Form(...)):
-    """使用者登入"""
+    """✅ 使用者登入 - 返回 UUID"""
     try:
+        print(f"[INFO] 登入嘗試: {username}")
+        
         result = supabase_client.client.table("users")\
             .select("*")\
             .eq("username", username)\
@@ -76,34 +80,52 @@ async def login(username: str = Form(...), password: str = Form(...)):
             .execute()
         
         if result.data:
+            user_id = result.data[0]['id']  # ✅ 現在是 UUID
+            print(f"[INFO] 登入成功: {username} (ID: {user_id})")
+            
             return {
                 "success": True,
-                "user_id": result.data[0]['id'],
+                "user_id": user_id,  # ✅ UUID 字串
                 "username": username
             }
         else:
+            print(f"[WARNING] 登入失敗: {username} - 帳號或密碼錯誤")
             return {"success": False, "message": "帳號或密碼錯誤"}
     except Exception as e:
+        print(f"[ERROR] 登入異常: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/register")
 async def register(username: str = Form(...), password: str = Form(...)):
-    """使用者註冊"""
+    """✅ 使用者註冊 - 自動生成 UUID"""
     try:
+        print(f"[INFO] 註冊嘗試: {username}")
+        
+        # 檢查使用者是否已存在
         existing = supabase_client.client.table("users")\
             .select("id")\
             .eq("username", username)\
             .execute()
         
         if existing.data:
+            print(f"[WARNING] 註冊失敗: {username} - 使用者名稱已存在")
             return {"success": False, "message": "使用者名稱已存在"}
         
+        # ✅ 自動生成 UUID
+        new_user_id = str(uuid.uuid4())
+        
         result = supabase_client.client.table("users")\
-            .insert({"username": username, "password": password})\
+            .insert({
+                "id": new_user_id,  # ✅ 明確提供 UUID
+                "username": username,
+                "password": password
+            })\
             .execute()
         
+        print(f"[INFO] 註冊成功: {username} (ID: {new_user_id})")
         return {"success": True, "message": "註冊成功"}
     except Exception as e:
+        print(f"[ERROR] 註冊異常: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ========== 天氣 API ==========
@@ -115,54 +137,103 @@ async def get_weather(city: str = "Taipei"):
         return weather.to_dict()
     raise HTTPException(status_code=404, detail="無法獲取天氣資料")
 
-# ========== 上傳 API ==========
+# ========== 上傳 API - 更新版本 ==========
 @app.post("/api/upload")
-async def upload_images(
-    files: List[UploadFile] = File(...),
-    user_id: str = Form(...)
-):
-    """批次上傳圖片並進行 AI 辨識"""
+async def upload_images(request: Request):
+    """✅ 批次上傳圖片並進行 AI 辨識 - 支援 UUID"""
     try:
+        form = await request.form()
+        
+        # 獲取參數
+        user_id = form.get("user_id")  # ✅ 現在是 UUID 字串
+        if not user_id:
+            raise HTTPException(status_code=400, detail="缺少 user_id")
+        
+        print(f"[INFO] 上傳開始: user_id={user_id}")
+        
+        # 獲取所有檔案
+        files = form.getlist("files")
+        if not files or len(files) == 0:
+            raise HTTPException(status_code=400, detail="沒有選擇檔案")
+        
+        if len(files) > config.max_batch_upload:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"最多只能上傳 {config.max_batch_upload} 張圖片"
+            )
+        
+        # 讀取所有圖片 bytes
         img_bytes_list = []
         file_names = []
         
         for file in files:
+            if not file.filename:
+                continue
+            
+            if file.content_type not in ['image/jpeg', 'image/png', 'image/jpg']:
+                continue
+            
             content = await file.read()
+            
+            if len(content) > 10 * 1024 * 1024:  # 10MB
+                continue
+            
             img_bytes_list.append(content)
             file_names.append(file.filename)
         
+        if not img_bytes_list:
+            raise HTTPException(status_code=400, detail="沒有有效的圖片檔案")
+        
+        # 呼叫 AI 服務
         tags_list = ai_service.batch_auto_tag(img_bytes_list)
         
         if not tags_list:
-            return {"success": False, "message": "AI 辨識失敗"}
+            return {
+                "success": False,
+                "message": "AI 辨識失敗，請稍後重試"
+            }
         
+        # 儲存到資料庫
         success_items = []
         duplicate_count = 0
         fail_count = 0
         
         for img_bytes, tags, filename in zip(img_bytes_list, tags_list, file_names):
-            img_hash = wardrobe_service.get_image_hash(img_bytes)
-            is_duplicate, _ = wardrobe_service.check_duplicate_image(user_id, img_hash)
-            
-            if is_duplicate:
-                duplicate_count += 1
-                continue
-            
-            item = ClothingItem(
-                user_id=user_id,
-                name=tags.get('name', filename),
-                category=tags.get('category', '其他'),
-                color=tags.get('color', '未知'),
-                style=tags.get('style', ''),
-                warmth=tags.get('warmth', 5)
-            )
-            
-            success, msg = wardrobe_service.save_item(item, img_bytes)
-            
-            if success:
-                success_items.append(tags)
-            else:
+            try:
+                # 檢查重複
+                img_hash = wardrobe_service.get_image_hash(img_bytes)
+                is_duplicate, existing_name = wardrobe_service.check_duplicate_image(
+                    user_id, img_hash
+                )
+                
+                if is_duplicate:
+                    duplicate_count += 1
+                    print(f"[INFO] 重複圖片: {filename}")
+                    continue
+                
+                # 建立衣物項目
+                item = ClothingItem(
+                    user_id=user_id,  # ✅ UUID 字串
+                    name=tags.get('name', filename),
+                    category=tags.get('category', '其他'),
+                    color=tags.get('color', '未知'),
+                    style=tags.get('style', ''),
+                    warmth=int(tags.get('warmth', 5))
+                )
+                
+                # 儲存到 DB
+                success, msg = wardrobe_service.save_item(item, img_bytes)
+                
+                if success:
+                    success_items.append(tags)
+                    print(f"[INFO] 成功儲存: {item.name}")
+                else:
+                    fail_count += 1
+                    print(f"[ERROR] 儲存失敗: {filename}")
+                    
+            except Exception as e:
                 fail_count += 1
+                print(f"[ERROR] 處理圖片失敗: {str(e)}")
         
         return {
             "success": True,
@@ -172,36 +243,76 @@ async def upload_images(
             "items": success_items
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] 上傳端點異常: {str(e)}")
+        raise HTTPException(status_code=500, detail="上傳處理失敗")
 
-# ========== 衣櫥 API ==========
+# ========== 衣櫥 API - 更新版本 ==========
 @app.get("/api/wardrobe")
 async def get_wardrobe(user_id: str):
-    """獲取使用者衣櫥"""
-    items = wardrobe_service.get_wardrobe(user_id)
-    return {
-        "success": True,
-        "items": [item.to_dict() for item in items]
-    }
+    """✅ 獲取使用者衣櫥 - 支援 UUID"""
+    try:
+        print(f"[INFO] 查詢衣櫥: user_id={user_id}")
+        
+        # ✅ 驗證 user_id 是否為有效的 UUID
+        try:
+            uuid.UUID(user_id)
+        except ValueError:
+            print(f"[WARNING] 無效的 UUID: {user_id}")
+            return {"success": False, "message": "無效的 user_id"}
+        
+        items = wardrobe_service.get_wardrobe(user_id)
+        print(f"[INFO] 查詢完成: {len(items)} 件衣物")
+        
+        return {
+            "success": True,
+            "items": [item.to_dict() for item in items]
+        }
+    except Exception as e:
+        print(f"[ERROR] 衣櫥查詢失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/wardrobe/delete")
 async def delete_item(user_id: str = Form(...), item_id: int = Form(...)):
-    """刪除單件衣物"""
-    success = wardrobe_service.delete_item(user_id, item_id)
-    return {"success": success}
+    """✅ 刪除單件衣物 - 支援 UUID"""
+    try:
+        # 驗證 UUID
+        try:
+            uuid.UUID(user_id)
+        except ValueError:
+            return {"success": False, "message": "無效的 user_id"}
+        
+        success = wardrobe_service.delete_item(user_id, item_id)
+        return {"success": success}
+    except Exception as e:
+        print(f"[ERROR] 刪除失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/wardrobe/batch-delete")
 async def batch_delete(user_id: str = Form(...), item_ids: List[int] = Form(...)):
-    """批次刪除衣物"""
-    success, success_count, fail_count = wardrobe_service.batch_delete_items(user_id, item_ids)
-    return {
-        "success": success,
-        "success_count": success_count,
-        "fail_count": fail_count
-    }
+    """✅ 批次刪除衣物 - 支援 UUID"""
+    try:
+        # 驗證 UUID
+        try:
+            uuid.UUID(user_id)
+        except ValueError:
+            return {"success": False, "message": "無效的 user_id"}
+        
+        success, success_count, fail_count = wardrobe_service.batch_delete_items(
+            user_id, item_ids
+        )
+        return {
+            "success": success,
+            "success_count": success_count,
+            "fail_count": fail_count
+        }
+    except Exception as e:
+        print(f"[ERROR] 批量刪除失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# ========== 推薦 API ==========
+# ========== 推薦 API - 更新版本 ==========
 @app.post("/api/recommendation")
 async def get_recommendation(
     user_id: str = Form(...),
@@ -209,12 +320,20 @@ async def get_recommendation(
     style: str = Form(""),
     occasion: str = Form("外出遊玩")
 ):
-    """獲取穿搭推薦"""
+    """✅ 獲取穿搭推薦 - 支援 UUID"""
     try:
+        # 驗證 UUID
+        try:
+            uuid.UUID(user_id)
+        except ValueError:
+            return {"success": False, "message": "無效的 user_id"}
+        
+        print(f"[INFO] 推薦請求: user_id={user_id}, city={city}")
+        
         wardrobe = wardrobe_service.get_wardrobe(user_id)
         
         if not wardrobe:
-            return {"success": False, "message": "衣櫥是空的,請先上傳衣服"}
+            return {"success": False, "message": "衣櫥是空的，請先上傳衣服"}
         
         weather = weather_service.get_weather(city)
         
@@ -237,6 +356,7 @@ async def get_recommendation(
         }
         
     except Exception as e:
+        print(f"[ERROR] 推薦生成失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ========== 啟動 ==========
