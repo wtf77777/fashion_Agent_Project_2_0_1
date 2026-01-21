@@ -108,55 +108,95 @@ async def get_weather(city: str = "Taipei"):
 
 @app.post("/api/upload")
 async def upload_images(request: Request):
-    """上傳衣物"""
+    """上傳衣物 - 完整除錯版本"""
     try:
+        print("[DEBUG] ========== 開始上傳流程 ==========")
+        
         form = await request.form()
         user_id = form.get("user_id")
         files = form.getlist("files")
         
+        print(f"[INFO] user_id: {user_id} (type: {type(user_id)})")
+        print(f"[INFO] 檔案數量: {len(files) if files else 0}")
+        
         if not user_id or not files:
+            print("[ERROR] 缺少必要參數")
             return {"success": False, "message": "缺少必要參數"}
         
         # 讀取圖片
         img_bytes_list = []
         file_names = []
         
-        for file in files:
+        for idx, file in enumerate(files):
             content = await file.read()
             img_bytes_list.append(content)
             file_names.append(file.filename)
+            print(f"[INFO] 檔案 {idx+1}: {file.filename} ({len(content)} bytes)")
         
         # AI 辨識
+        print("[INFO] 開始 AI 辨識...")
         tags_list = ai_service.batch_auto_tag(img_bytes_list)
+        print(f"[INFO] AI 辨識結果: {tags_list}")
+        
         if not tags_list:
+            print("[ERROR] AI 辨識返回 None")
             return {"success": False, "message": "AI 辨識失敗"}
         
         # 儲存
+        print("[INFO] 開始儲存到資料庫...")
         success_count = 0
-        for img_bytes, tags, filename in zip(img_bytes_list, tags_list, file_names):
+        fail_count = 0
+        success_items = []
+        
+        for idx, (img_bytes, tags, filename) in enumerate(zip(img_bytes_list, tags_list, file_names)):
             try:
+                print(f"[INFO] 處理第 {idx+1} 件: {tags.get('name')}")
+                
                 item = ClothingItem(
-                    user_id=user_id,
+                    user_id=str(user_id),  # ✅ 確保是字串
                     name=tags.get('name', filename),
                     category=tags.get('category', '其他'),
                     color=tags.get('color', '未知'),
                     style=tags.get('style', ''),
                     warmth=int(tags.get('warmth', 5))
                 )
-                success, _ = wardrobe_service.save_item(item, img_bytes)
+                
+                print(f"[DEBUG] 準備儲存: user_id={item.user_id}, name={item.name}")
+                success, msg = wardrobe_service.save_item(item, img_bytes)
+                
                 if success:
+                    print(f"[SUCCESS] 第 {idx+1} 件儲存成功")
                     success_count += 1
+                    success_items.append(tags)
+                else:
+                    print(f"[ERROR] 第 {idx+1} 件儲存失敗: {msg}")
+                    fail_count += 1
+                    
             except Exception as e:
-                print(f"[ERROR] 儲存衣物: {str(e)}")
+                print(f"[ERROR] 處理第 {idx+1} 件時發生異常:")
+                print(f"  錯誤類型: {type(e).__name__}")
+                print(f"  錯誤訊息: {str(e)}")
+                import traceback
+                print(f"[TRACE] {traceback.format_exc()}")
+                fail_count += 1
+        
+        print(f"[INFO] ========== 上傳完成: 成功 {success_count}, 失敗 {fail_count} ==========")
         
         return {
             "success": True,
             "success_count": success_count,
-            "items": tags_list[:success_count]
+            "fail_count": fail_count,
+            "duplicate_count": 0,
+            "items": success_items
         }
+        
     except Exception as e:
-        print(f"[ERROR] 上傳: {str(e)}")
-        return {"success": False, "message": "上傳失敗"}
+        print(f"[ERROR] 上傳流程異常:")
+        print(f"  錯誤類型: {type(e).__name__}")
+        print(f"  錯誤訊息: {str(e)}")
+        import traceback
+        print(f"[TRACE] {traceback.format_exc()}")
+        return {"success": False, "message": f"上傳失敗: {str(e)}"}
 
 # ========== 衣櫥 ==========
 
