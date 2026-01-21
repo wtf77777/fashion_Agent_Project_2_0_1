@@ -32,7 +32,45 @@ const WardrobeUI = {
     },
     
     // ========== 輔助函數 ==========
-    
+    updateStatsSafely() {
+        const totalItemsEl = document.getElementById('total-items');
+        const statsGridEl = document.getElementById('wardrobe-stats');
+        
+        if (!totalItemsEl || !statsGridEl) {
+            console.warn('⚠️ 統計元素不存在');
+            return;
+        }
+        
+        try {
+            // ✨ 修改：顯示篩選後的數量
+            const filteredItems = this.getFilteredItems();
+            totalItemsEl.textContent = filteredItems.length;
+            
+            // 計算所有分類統計（不受篩選影響）
+            const categories = {};
+            this.items.forEach(item => {
+                const cat = item.category || '其他';
+                categories[cat] = (categories[cat] || 0) + 1;
+            });
+            
+            statsGridEl.innerHTML = `
+                <div class="stat-card">
+                    <span class="stat-label">總計</span>
+                    <span class="stat-value">${this.items.length}</span>
+                </div>
+                ${Object.entries(categories).map(([cat, count]) => `
+                    <div class="stat-card">
+                        <span class="stat-label">${this.escapeHtml(cat)}</span>
+                        <span class="stat-value">${count}</span>
+                    </div>
+                `).join('')}
+            `;
+            
+            console.log('📊 統計資訊已更新');
+        } catch (error) {
+            console.error('❌ 更新統計資訊失敗:', error);
+        }
+    },    
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -103,45 +141,7 @@ const WardrobeUI = {
         return this.items.filter(item => item.category === this.currentCategory);
     },
     
-    updateStatsSafely() {
-        const totalItemsEl = document.getElementById('total-items');
-        const statsGridEl = document.getElementById('wardrobe-stats');
-        
-        if (!totalItemsEl || !statsGridEl) {
-            console.warn('⚠️ 統計元素不存在');
-            return;
-        }
-        
-        try {
-            // ✨ 修改：顯示篩選後的數量
-            const filteredItems = this.getFilteredItems();
-            totalItemsEl.textContent = filteredItems.length;
-            
-            // 計算所有分類統計（不受篩選影響）
-            const categories = {};
-            this.items.forEach(item => {
-                const cat = item.category || '其他';
-                categories[cat] = (categories[cat] || 0) + 1;
-            });
-            
-            statsGridEl.innerHTML = `
-                <div class="stat-card">
-                    <span class="stat-label">總計</span>
-                    <span class="stat-value">${this.items.length}</span>
-                </div>
-                ${Object.entries(categories).map(([cat, count]) => `
-                    <div class="stat-card">
-                        <span class="stat-label">${this.escapeHtml(cat)}</span>
-                        <span class="stat-value">${count}</span>
-                    </div>
-                `).join('')}
-            `;
-            
-            console.log('📊 統計資訊已更新');
-        } catch (error) {
-            console.error('❌ 更新統計資訊失敗:', error);
-        }
-    },
+
     
     // ========== 主要邏輯 ==========
     
