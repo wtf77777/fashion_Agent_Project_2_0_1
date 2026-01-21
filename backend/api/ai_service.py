@@ -14,7 +14,7 @@ class AIService:
         self.rate_limit_seconds = rate_limit_seconds
         self.last_request_time = 0
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
     
     def _rate_limit_wait(self):
         """API 速率限制保護"""
