@@ -1,7 +1,8 @@
 """
-FastAPI 後端 - 使用 UUID 認證
+FastAPI 後端 - AI Fashion Assistant
+修復版本：正確處理 UUID
 """
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Request  # ✅ 添加 Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -65,7 +66,7 @@ async def health_check():
         "database": "connected" if db_ok else "disconnected"
     }
 
-# ========== 認證 API - 更新版本 ==========
+# ========== 認證 API ==========
 
 @app.post("/api/login")
 async def login(username: str = Form(...), password: str = Form(...)):
@@ -79,8 +80,8 @@ async def login(username: str = Form(...), password: str = Form(...)):
             .eq("password", password)\
             .execute()
         
-        if result.data:
-            user_id = result.data[0]['id']  # ✅ 現在是 UUID
+        if result.data and len(result.data) > 0:
+            user_id = result.data[0]['id']  # ✅ UUID
             print(f"[INFO] 登入成功: {username} (ID: {user_id})")
             
             return {
@@ -97,7 +98,7 @@ async def login(username: str = Form(...), password: str = Form(...)):
 
 @app.post("/api/register")
 async def register(username: str = Form(...), password: str = Form(...)):
-    """✅ 使用者註冊 - 自動生成 UUID"""
+    """✅ 使用者註冊 - 讓 Supabase 自動生成 UUID"""
     try:
         print(f"[INFO] 註冊嘗試: {username}")
         
@@ -107,23 +108,27 @@ async def register(username: str = Form(...), password: str = Form(...)):
             .eq("username", username)\
             .execute()
         
-        if existing.data:
+        if existing.data and len(existing.data) > 0:
             print(f"[WARNING] 註冊失敗: {username} - 使用者名稱已存在")
             return {"success": False, "message": "使用者名稱已存在"}
         
-        # ✅ 自動生成 UUID
-        new_user_id = str(uuid.uuid4())
-        
+        # ✅ 讓 Supabase 自動生成 UUID，不要手動提供
         result = supabase_client.client.table("users")\
             .insert({
-                "id": new_user_id,  # ✅ 明確提供 UUID
                 "username": username,
                 "password": password
+                # ❌ 不提供 id，讓資料庫自動生成
             })\
             .execute()
         
-        print(f"[INFO] 註冊成功: {username} (ID: {new_user_id})")
-        return {"success": True, "message": "註冊成功"}
+        if result.data and len(result.data) > 0:
+            new_user_id = result.data[0]['id']
+            print(f"[INFO] 註冊成功: {username} (ID: {new_user_id})")
+            return {"success": True, "message": "註冊成功"}
+        else:
+            print(f"[WARNING] 註冊失敗: {username} - 資料庫插入失敗")
+            return {"success": False, "message": "註冊失敗"}
+            
     except Exception as e:
         print(f"[ERROR] 註冊異常: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -132,22 +137,30 @@ async def register(username: str = Form(...), password: str = Form(...)):
 @app.get("/api/weather")
 async def get_weather(city: str = "Taipei"):
     """獲取天氣資料"""
-    weather = weather_service.get_weather(city)
-    if weather:
-        return weather.to_dict()
-    raise HTTPException(status_code=404, detail="無法獲取天氣資料")
+    try:
+        weather = weather_service.get_weather(city)
+        if weather:
+            return weather.to_dict()
+        raise HTTPException(status_code=404, detail="無法獲取天氣資料")
+    except Exception as e:
+        print(f"[ERROR] 天氣查詢失敗: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# ========== 上傳 API - 更新版本 ==========
+# ========== 上傳 API ==========
 @app.post("/api/upload")
 async def upload_images(request: Request):
-    """✅ 批次上傳圖片並進行 AI 辨識 - 支援 UUID"""
+    """✅ 批次上傳圖片並進行 AI 辨識"""
     try:
         form = await request.form()
         
         # 獲取參數
-        user_id = form.get("user_id")  # ✅ 現在是 UUID 字串
+        user_id = form.get("user_id")
         if not user_id:
             raise HTTPException(status_code=400, detail="缺少 user_id")
+        
+        # ✅ 驗證 UUID 格式
+        if not _is_valid_uuid(user_id):
+            return {"success": False, "message": "無效的 UUID 格式"}
         
         print(f"[INFO] 上傳開始: user_id={user_id}")
         
@@ -249,19 +262,16 @@ async def upload_images(request: Request):
         print(f"[ERROR] 上傳端點異常: {str(e)}")
         raise HTTPException(status_code=500, detail="上傳處理失敗")
 
-# ========== 衣櫥 API - 更新版本 ==========
+# ========== 衣櫥 API ==========
 @app.get("/api/wardrobe")
 async def get_wardrobe(user_id: str):
-    """✅ 獲取使用者衣櫥 - 支援 UUID"""
+    """✅ 獲取使用者衣櫥"""
     try:
-        print(f"[INFO] 查詢衣櫥: user_id={user_id}")
+        # ✅ 驗證 UUID 格式
+        if not _is_valid_uuid(user_id):
+            return {"success": False, "message": "無效的 UUID 格式"}
         
-        # ✅ 驗證 user_id 是否為有效的 UUID
-        try:
-            uuid.UUID(user_id)
-        except ValueError:
-            print(f"[WARNING] 無效的 UUID: {user_id}")
-            return {"success": False, "message": "無效的 user_id"}
+        print(f"[INFO] 查詢衣櫥: user_id={user_id}")
         
         items = wardrobe_service.get_wardrobe(user_id)
         print(f"[INFO] 查詢完成: {len(items)} 件衣物")
@@ -276,13 +286,11 @@ async def get_wardrobe(user_id: str):
 
 @app.post("/api/wardrobe/delete")
 async def delete_item(user_id: str = Form(...), item_id: int = Form(...)):
-    """✅ 刪除單件衣物 - 支援 UUID"""
+    """✅ 刪除單件衣物"""
     try:
-        # 驗證 UUID
-        try:
-            uuid.UUID(user_id)
-        except ValueError:
-            return {"success": False, "message": "無效的 user_id"}
+        # ✅ 驗證 UUID
+        if not _is_valid_uuid(user_id):
+            return {"success": False, "message": "無效的 UUID 格式"}
         
         success = wardrobe_service.delete_item(user_id, item_id)
         return {"success": success}
@@ -292,13 +300,11 @@ async def delete_item(user_id: str = Form(...), item_id: int = Form(...)):
 
 @app.post("/api/wardrobe/batch-delete")
 async def batch_delete(user_id: str = Form(...), item_ids: List[int] = Form(...)):
-    """✅ 批次刪除衣物 - 支援 UUID"""
+    """✅ 批次刪除衣物"""
     try:
-        # 驗證 UUID
-        try:
-            uuid.UUID(user_id)
-        except ValueError:
-            return {"success": False, "message": "無效的 user_id"}
+        # ✅ 驗證 UUID
+        if not _is_valid_uuid(user_id):
+            return {"success": False, "message": "無效的 UUID 格式"}
         
         success, success_count, fail_count = wardrobe_service.batch_delete_items(
             user_id, item_ids
@@ -312,7 +318,7 @@ async def batch_delete(user_id: str = Form(...), item_ids: List[int] = Form(...)
         print(f"[ERROR] 批量刪除失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# ========== 推薦 API - 更新版本 ==========
+# ========== 推薦 API ==========
 @app.post("/api/recommendation")
 async def get_recommendation(
     user_id: str = Form(...),
@@ -320,13 +326,11 @@ async def get_recommendation(
     style: str = Form(""),
     occasion: str = Form("外出遊玩")
 ):
-    """✅ 獲取穿搭推薦 - 支援 UUID"""
+    """✅ 獲取穿搭推薦"""
     try:
-        # 驗證 UUID
-        try:
-            uuid.UUID(user_id)
-        except ValueError:
-            return {"success": False, "message": "無效的 user_id"}
+        # ✅ 驗證 UUID
+        if not _is_valid_uuid(user_id):
+            return {"success": False, "message": "無效的 UUID 格式"}
         
         print(f"[INFO] 推薦請求: user_id={user_id}, city={city}")
         
@@ -358,6 +362,19 @@ async def get_recommendation(
     except Exception as e:
         print(f"[ERROR] 推薦生成失敗: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ========== 輔助函數 ==========
+
+def _is_valid_uuid(value: str) -> bool:
+    """✅ 驗證字串是否為有效的 UUID"""
+    if not value or not isinstance(value, str):
+        return False
+    
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
 
 # ========== 啟動 ==========
 if __name__ == "__main__":
