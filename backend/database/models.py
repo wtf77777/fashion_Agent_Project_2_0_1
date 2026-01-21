@@ -1,7 +1,22 @@
 from dataclasses import dataclass
 from typing import Optional
 from datetime import datetime
-
+@dataclass
+class WeatherData:
+    """天氣資料模型"""
+    temp: float
+    feels_like: float
+    desc: str
+    city: str
+    update_time: datetime
+    
+    def to_dict(self) -> dict:
+        return {
+            "temp": round(self.temp, 1),
+            "feels_like": round(self.feels_like, 1),
+            "desc": self.desc,
+            "city": self.city
+        }
 @dataclass
 class ClothingItem:
     """衣物模型"""
