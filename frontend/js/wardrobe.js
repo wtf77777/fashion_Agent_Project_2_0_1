@@ -1,15 +1,16 @@
-// ========== 衣櫥頁面 UI 邏輯 - 修復版本 ==========
+// ========== 衣櫥頁面 UI 邏輯 - 正確順序版本 ==========
 const WardrobeUI = {
     items: [],
     selectedItems: new Set(),
     isBatchDeleteMode: false,
     
+    // ========== 初始化 ==========
     init() {
         this.bindEvents();
     },
     
+    // ========== 事件綁定 ==========
     bindEvents() {
-        // 🔧 添加存在性檢查
         const refreshBtn = document.getElementById('refresh-wardrobe-btn');
         const deleteBtn = document.getElementById('batch-delete-btn');
         
@@ -29,6 +30,60 @@ const WardrobeUI = {
         });
     },
     
+    // ========== 輔助函數 - 放在最前面 ==========
+    
+    escapeHtml(text) {
+        /**防止 XSS 攻擊*/
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+    
+    /**✅ 安全版本的 updateStats - 必須放在 loadWardrobe 之前*/
+    updateStatsSafely() {
+        const totalItemsEl = document.getElementById('total-items');
+        const statsGridEl = document.getElementById('wardrobe-stats');
+        
+        if (!totalItemsEl) {
+            console.warn('⚠️ total-items 元素不存在');
+            return;
+        }
+        
+        if (!statsGridEl) {
+            console.warn('⚠️ wardrobe-stats 元素不存在');
+            return;
+        }
+        
+        try {
+            totalItemsEl.textContent = this.items.length;
+            
+            const categories = {};
+            this.items.forEach(item => {
+                const cat = item.category || '其他';
+                categories[cat] = (categories[cat] || 0) + 1;
+            });
+            
+            statsGridEl.innerHTML = `
+                <div class="stat-card">
+                    <span class="stat-label">總計</span>
+                    <span class="stat-value">${this.items.length}</span>
+                </div>
+                ${Object.entries(categories).map(([cat, count]) => `
+                    <div class="stat-card">
+                        <span class="stat-label">${this.escapeHtml(cat)}</span>
+                        <span class="stat-value">${count}</span>
+                    </div>
+                `).join('')}
+            `;
+            
+            console.log('📊 統計資訊已更新');
+        } catch (error) {
+            console.error('❌ 更新統計資訊失敗:', error);
+        }
+    },
+    
+    // ========== 主要邏輯 - 在輔助函數之後 ==========
+    
     async loadWardrobe() {
         AppState.setLoading(true);
         
@@ -42,7 +97,6 @@ const WardrobeUI = {
                 this.items = result.items || [];
                 console.log(`✅ 成功載入 ${this.items.length} 件衣服`);
                 
-                // 🔧 先檢查 DOM 元素是否存在
                 const wardrobeGrid = document.getElementById('wardrobe-grid');
                 if (!wardrobeGrid) {
                     console.error('❌ wardrobe-grid 元素不存在');
@@ -50,10 +104,9 @@ const WardrobeUI = {
                     return;
                 }
                 
-                // 渲染衣物網格
                 this.renderWardrobe();
                 
-                // 🔧 安全地更新統計資訊
+                // ✅ 現在 updateStatsSafely 已經定義了
                 this.updateStatsSafely();
                 
                 Toast.success(`✅ 已載入 ${this.items.length} 件衣服`);
@@ -65,7 +118,6 @@ const WardrobeUI = {
             console.error('💥 載入衣櫥發生錯誤:', error);
             Toast.error('載入失敗: ' + error.message);
             
-            // 顯示空狀態
             const wardrobeGrid = document.getElementById('wardrobe-grid');
             const emptyState = document.getElementById('wardrobe-empty');
             if (wardrobeGrid && emptyState) {
@@ -85,7 +137,6 @@ const WardrobeUI = {
         const grid = document.getElementById('wardrobe-grid');
         const emptyState = document.getElementById('wardrobe-empty');
         
-        // 🔧 檢查元素是否存在
         if (!grid || !emptyState) {
             console.error('❌ 衣櫥渲染元素不存在');
             return;
@@ -117,7 +168,6 @@ const WardrobeUI = {
     },
     
     createItemCard(item) {
-        // 🔧 驗證必要欄位
         if (!item.id || !item.name) {
             console.warn('⚠️ 衣物缺少必要欄位:', item);
             return document.createElement('div');
@@ -127,7 +177,6 @@ const WardrobeUI = {
         card.className = 'wardrobe-item';
         card.dataset.itemId = item.id;
         
-        // 批量刪除模式下的選擇框
         let checkboxHTML = '';
         if (this.isBatchDeleteMode) {
             const isSelected = this.selectedItems.has(item.id);
@@ -142,7 +191,6 @@ const WardrobeUI = {
             `;
         }
         
-        // 🔧 安全地處理圖片和基本欄位
         const imageSrc = item.image_data ? 
             `data:image/jpeg;base64,${item.image_data}` : 
             'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23ddd%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22%3E無圖片%3C/text%3E%3C/svg%3E';
@@ -181,60 +229,6 @@ const WardrobeUI = {
         return card;
     },
     
-    escapeHtml(text) {
-        // 防止 XSS 攻擊
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-    
-    // 🔧 新增：安全版本的 updateStats
-    updateStatsSafely() {
-        // 檢查元素是否存在
-        const totalItemsEl = document.getElementById('total-items');
-        const statsGridEl = document.getElementById('wardrobe-stats');
-        
-        if (!totalItemsEl) {
-            console.warn('⚠️ total-items 元素不存在');
-            return;
-        }
-        
-        if (!statsGridEl) {
-            console.warn('⚠️ wardrobe-stats 元素不存在');
-            return;
-        }
-        
-        try {
-            // 更新總數
-            totalItemsEl.textContent = this.items.length;
-            
-            // 計算分類統計
-            const categories = {};
-            this.items.forEach(item => {
-                const cat = item.category || '其他';
-                categories[cat] = (categories[cat] || 0) + 1;
-            });
-            
-            // 更新統計網格
-            statsGridEl.innerHTML = `
-                <div class="stat-card">
-                    <span class="stat-label">總計</span>
-                    <span class="stat-value">${this.items.length}</span>
-                </div>
-                ${Object.entries(categories).map(([cat, count]) => `
-                    <div class="stat-card">
-                        <span class="stat-label">${this.escapeHtml(cat)}</span>
-                        <span class="stat-value">${count}</span>
-                    </div>
-                `).join('')}
-            `;
-            
-            console.log('📊 統計資訊已更新');
-        } catch (error) {
-            console.error('❌ 更新統計資訊失敗:', error);
-        }
-    },
-    
     toggleBatchDeleteMode() {
         this.isBatchDeleteMode = !this.isBatchDeleteMode;
         
@@ -255,7 +249,6 @@ const WardrobeUI = {
             btn.classList.remove('btn-primary');
             btn.classList.add('btn-secondary');
             
-            // 如果有選中的項目，執行刪除
             if (this.selectedItems.size > 0) {
                 console.log(`🗑️ 要刪除 ${this.selectedItems.size} 件衣物`);
                 this.executeBatchDelete();
@@ -264,7 +257,6 @@ const WardrobeUI = {
             }
         }
         
-        // 重新渲染
         this.renderWardrobe();
     },
     
@@ -275,7 +267,6 @@ const WardrobeUI = {
             this.selectedItems.add(itemId);
         }
         
-        // 更新按鈕文字
         const btn = document.getElementById('batch-delete-btn');
         if (!btn) return;
         
@@ -298,7 +289,6 @@ const WardrobeUI = {
             
             if (result.success) {
                 Toast.success('✅ 已刪除');
-                // 從列表中移除
                 this.items = this.items.filter(item => item.id !== itemId);
                 this.renderWardrobe();
                 this.updateStatsSafely();
@@ -338,7 +328,6 @@ const WardrobeUI = {
                     Toast.warning(`⚠️ ${result.fail_count} 件刪除失敗`);
                 }
                 
-                // 重新載入衣櫥
                 await this.loadWardrobe();
                 this.selectedItems.clear();
             } else {
