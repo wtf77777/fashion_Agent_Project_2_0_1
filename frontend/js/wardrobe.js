@@ -41,7 +41,7 @@ const WardrobeUI = {
     
     /**✅ 安全版本的 updateStats - 必須放在 loadWardrobe 之前*/
     updateStatsSafely() {
-        const totalItemsEl = document.getElementById('total-items');
+        const totalItemsEl = document.getElementById('items');
         const statsGridEl = document.getElementById('wardrobe-stats');
         
         if (!totalItemsEl) {
