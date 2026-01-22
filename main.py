@@ -34,6 +34,10 @@ wardrobe_service = WardrobeService(supabase_client)
 
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(status_code=204)
+
 @app.get("/")
 async def read_root():
     return FileResponse("frontend/index.html")
