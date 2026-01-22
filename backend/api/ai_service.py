@@ -35,10 +35,14 @@ class AIService:
             img_bytes_list: 圖片 bytes 列表
             
         Returns:
-            標籤列表或 None（如果失敗）
+            標籤列表或 None(如果失敗)
         """
         try:
+            print(f"[AI] 開始批次辨識 {len(img_bytes_list)} 張圖片...")
+            
+            # 速率限制等待
             self._rate_limit_wait()
+            print(f"[AI] 速率限制檢查通過")
             
             prompt = f"""請仔細分析這 {len(img_bytes_list)} 件衣服,為每件衣服分別回傳 JSON 格式的標籤。
 
@@ -62,43 +66,61 @@ class AIService:
 """
             
             content_parts = [prompt]
-            for img_bytes in img_bytes_list:
+            for idx, img_bytes in enumerate(img_bytes_list):
                 content_parts.append({
                     "mime_type": "image/jpeg",
                     "data": img_bytes
                 })
+                print(f"[AI] 準備圖片 {idx+1}/{len(img_bytes_list)}, 大小={len(img_bytes)} bytes")
             
+            print(f"[AI] 發送請求到 Gemini API...")
             response = self.model.generate_content(content_parts)
+            print(f"[AI] 收到 API 回應")
             
             # 清理並解析回應
-            clean_text = response.text.strip()
-            clean_text = clean_text.replace('```json', '').replace('```', '').strip()
+            raw_text = response.text
+            print(f"[AI] 原始回應長度: {len(raw_text)} 字元")
+            print(f"[AI] 原始回應前 200 字元: {raw_text[:200]}")
             
+            clean_text = raw_text.strip()
+            clean_text = clean_text.replace('```json', '').replace('```', '').strip()
+            print(f"[AI] 清理後回應長度: {len(clean_text)} 字元")
+            
+            # 解析 JSON
+            print(f"[AI] 開始解析 JSON...")
             tags_list = json.loads(clean_text)
+            print(f"[AI] JSON 解析成功")
             
             # 驗證回應
             if not isinstance(tags_list, list):
-                raise ValueError("AI 回傳格式錯誤: 應為陣列")
+                raise ValueError(f"AI 回傳格式錯誤: 應為陣列,實際為 {type(tags_list)}")
             
+            print(f"[AI] 驗證陣列長度: 預期={len(img_bytes_list)}, 實際={len(tags_list)}")
             if len(tags_list) != len(img_bytes_list):
                 raise ValueError(f"AI 回傳數量不符: 預期 {len(img_bytes_list)} 件,實際 {len(tags_list)} 件")
             
             # 驗證必要欄位
             required_fields = ['name', 'category', 'color', 'warmth']
             for idx, tags in enumerate(tags_list):
+                print(f"[AI] 驗證第 {idx+1} 件衣服: {tags}")
                 for field in required_fields:
                     if field not in tags:
                         raise ValueError(f"第 {idx+1} 件衣服缺少必要欄位: {field}")
                 
                 tags['warmth'] = int(tags['warmth'])
             
+            print(f"[AI] ✅ 批次辨識完成,成功辨識 {len(tags_list)} 件衣服")
             return tags_list
             
         except json.JSONDecodeError as e:
-            print(f"JSON 解析錯誤: {str(e)}")
+            print(f"[AI] ❌ JSON 解析錯誤: {str(e)}")
+            print(f"[AI] 錯誤位置: 第 {e.lineno} 行, 第 {e.colno} 列")
+            print(f"[AI] 問題文字: {e.doc[:500] if hasattr(e, 'doc') else '無法取得'}")
             return None
         except Exception as e:
-            print(f"批次 AI 標籤失敗: {str(e)}")
+            print(f"[AI] ❌ 批次 AI 標籤失敗: {str(e)}")
+            import traceback
+            print(f"[AI] 詳細錯誤: {traceback.format_exc()}")
             return None
     
     def generate_outfit_recommendation(
