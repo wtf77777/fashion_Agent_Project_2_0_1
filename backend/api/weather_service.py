@@ -38,7 +38,11 @@ class WeatherService:
                 "StationName": city.replace("市", "").replace("縣", "")  # 移除「市」或「縣」字
             }
             
-            response = requests.get(url, params=params, timeout=10)
+            # 使用 verify=False 繞過 SSL 驗證 (解決 Render 上 Missing Subject Key Identifier 錯誤)
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            response = requests.get(url, params=params, timeout=10, verify=False)
+            
             response.raise_for_status()
             data = response.json()
             
