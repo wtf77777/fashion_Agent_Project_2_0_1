@@ -27,20 +27,12 @@ app.add_middleware(
 )
 
 config = AppConfig.from_env()
-
-if not config.gemini_api_key:
-    print("⚠️ WARNING: GEMINI_KEY environment variable is not set! Upload feature will fail.")
-if not config.supabase_url or not config.supabase_key:
-    print("⚠️ WARNING: Supabase credentials are missing!")
-
 supabase_client = SupabaseClient(config.supabase_url, config.supabase_key)
 ai_service = AIService(config.gemini_api_key)
 weather_service = WeatherService(config.weather_api_key)
 wardrobe_service = WardrobeService(supabase_client)
 
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
-app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
-app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 
 @app.get("/")
 async def read_root():
@@ -118,16 +110,12 @@ async def get_weather(city: str = "Taipei"):
 async def upload_images(request: Request):
     """上傳衣物"""
     try:
-        print("[INFO] 收到上傳請求")
         form = await request.form()
         user_id = form.get("user_id")
         files = form.getlist("files")
         
         if not user_id or not files:
-            print(f"[ERROR] 上傳參數不足: user_id={user_id}, files_count={len(files) if files else 0}")
             return {"success": False, "message": "缺少必要參數"}
-        
-        print(f"[INFO] User {user_id} 上傳了 {len(files)} 張圖片")
         
         # 讀取圖片
         img_bytes_list = []
@@ -139,14 +127,10 @@ async def upload_images(request: Request):
             file_names.append(file.filename)
         
         # AI 辨識
-        print("[INFO] 開始 AI 辨識...")
         tags_list = ai_service.batch_auto_tag(img_bytes_list)
         if not tags_list:
-            print("[ERROR] AI 辨識回傳 None")
-            return {"success": False, "message": "AI 辨識失敗，請稍後再試或檢查 Log"}
+            return {"success": False, "message": "AI 辨識失敗"}
         
-        print(f"[INFO] AI 辨識成功，取得 {len(tags_list)} 組標籤")
-
         # 儲存
         success_count = 0
         for img_bytes, tags, filename in zip(img_bytes_list, tags_list, file_names):
@@ -159,25 +143,20 @@ async def upload_images(request: Request):
                     style=tags.get('style', ''),
                     warmth=int(tags.get('warmth', 5))
                 )
-                success, msg = wardrobe_service.save_item(item, img_bytes)
+                success, _ = wardrobe_service.save_item(item, img_bytes)
                 if success:
                     success_count += 1
-                else:
-                    print(f"[ERROR] DB 儲存失敗 ({filename}): {msg}")
             except Exception as e:
-                print(f"[ERROR] 儲存例外 ({filename}): {str(e)}")
+                print(f"[ERROR] 儲存衣物: {str(e)}")
         
-        print(f"[INFO] 上傳完成: 成功 {success_count}/{len(files)}")
         return {
             "success": True,
             "success_count": success_count,
             "items": tags_list[:success_count]
         }
     except Exception as e:
-        print(f"[CRITICAL] 上傳 API 發生未預期錯誤: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {"success": False, "message": f"上傳失敗: {str(e)}"}
+        print(f"[ERROR] 上傳: {str(e)}")
+        return {"success": False, "message": "上傳失敗"}
 
 # ========== 衣櫥 ==========
 
