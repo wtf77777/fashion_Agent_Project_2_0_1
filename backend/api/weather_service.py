@@ -31,14 +31,15 @@ class WeatherService:
         
         # 獲取新資料
         try:
-            # 中央氣象署開放資料平台 API
-            url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
+            # 中央氣象署開放資料平台 API (O-A0003-001 局屬氣象站, O-A0001-001 自動氣象站)
+            # 這裡我們使用 O-A0003-001 (局屬氣象站) 加上 O-A0001-001 (自動氣象站) 的邏輯
+            # 為了確保能找到資料，我們不指定 StationName，而是抓回來自己篩選
+            url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001"
             params = {
-                "Authorization": self.api_key,
-                "StationName": city.replace("市", "").replace("縣", "")  # 移除「市」或「縣」字
+                "Authorization": self.api_key
             }
             
-            # 使用 verify=False 繞過 SSL 驗證 (解決 Render 上 Missing Subject Key Identifier 錯誤)
+            # 使用 verify=False 繞過 SSL 驗證
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             response = requests.get(url, params=params, timeout=10, verify=False)
@@ -55,18 +56,87 @@ class WeatherService:
             records = data.get('records', {})
             stations = records.get('Station', [])
             
-            if not stations:
-                print(f"找不到城市 {city} 的氣象站資料")
+            found_station = None
+            valid_weather_element = None
+            
+            # 確保輸入的城市名稱格式正確 (例如: 臺北市, 苗栗縣)
+            target_city = city
+            
+            # 輔助函數: 正規化城市名稱 (移除 縣/市, 統一 台/臺)
+            def normalize_name(name):
+                return name.replace('台', '臺').replace('縣', '').replace('市', '')
+            
+            target_city_norm = normalize_name(target_city)
+            
+            # 收集該縣市所有候選氣象站
+            candidates = []
+            
+            # 1. 搜尋局屬氣象站 (O-A0003-001)
+            for station in stations:
+                geo_info = station.get('GeoInfo', {})
+                county_name = geo_info.get('CountyName', '')
+                
+                if normalize_name(county_name) == target_city_norm:
+                    weather_element = station.get('WeatherElement', {})
+                    temp = float(weather_element.get('AirTemperature', -99))
+                    
+                    # 檢查溫度是否有效
+                    if temp > -90:
+                        altitude = float(geo_info.get('StationAltitude', 9999))
+                        candidates.append({
+                            'station': station,
+                            'altitude': altitude,
+                            'source': 'O-A0003-001'
+                        })
+
+            # 2. 如果候選名單很少(小於3個)，嘗試自動氣象站 (O-A0001-001) 補充資料
+            if len(candidates) < 3:
+                try:
+                    url_auto = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
+                    response_auto = requests.get(url_auto, params=params, timeout=10, verify=False)
+                    if response_auto.status_code == 200:
+                        data_auto = response_auto.json()
+                        if data_auto.get('success'):
+                            stations_auto = data_auto.get('records', {}).get('Station', [])
+                            for station in stations_auto:
+                                geo_info = station.get('GeoInfo', {})
+                                county_name = geo_info.get('CountyName', '')
+                                
+                                if normalize_name(county_name) == target_city_norm:
+                                    weather_element = station.get('WeatherElement', {})
+                                    temp = float(weather_element.get('AirTemperature', -99))
+                                    
+                                    if temp > -90:
+                                        altitude = float(geo_info.get('StationAltitude', 9999))
+                                        candidates.append({
+                                            'station': station,
+                                            'altitude': altitude,
+                                            'source': 'O-A0001-001'
+                                        })
+                except Exception as e:
+                    print(f"獲取自動氣象站資料失敗: {str(e)}")
+
+            if not candidates:
+                print(f"找不到城市 {city} 的有效氣象站資料")
                 return None
             
-            # 取第一個氣象站的資料
-            station = stations[0]
-            weather_element = station.get('WeatherElement', {})
+            # 3. 排序: 優先選擇海拔最低的氣象站 (避免選到高山測站如阿里山)
+            # 排序鍵: (海拔高度)
+            candidates.sort(key=lambda x: x['altitude'])
+            
+            # 選取海拔最低的站點
+            best_match = candidates[0]
+            found_station = best_match['station']
+            valid_weather_element = found_station.get('WeatherElement', {})
             
             # 提取溫度和天氣描述
-            temp = float(weather_element.get('AirTemperature', 0))
-            humidity = float(weather_element.get('RelativeHumidity', 0))
-            weather_desc = weather_element.get('Weather', '晴')
+            temp = float(valid_weather_element.get('AirTemperature', 0))
+            humidity = float(valid_weather_element.get('RelativeHumidity', 0))
+            weather_desc = valid_weather_element.get('Weather', '晴')
+            
+            # 如果天氣描述是無效值，給一個預設值
+            if weather_desc == '-99':
+                weather_desc = '多雲'
             
             # 計算體感溫度 (簡化版熱指數公式)
             # 當溫度高於26度且濕度高時,體感溫度會上升
