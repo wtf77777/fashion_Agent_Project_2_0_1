@@ -32,7 +32,7 @@ class WeatherService:
         # 獲取新資料
         try:
             # 中央氣象署開放資料平台 API
-            url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001"
+            url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001"
             params = {
                 "Authorization": self.api_key,
                 "StationName": city.replace("市", "").replace("縣", "")  # 移除「市」或「縣」字
