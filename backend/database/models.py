@@ -33,8 +33,11 @@ class ClothingItem:
     created_at: Optional[datetime] = None
     
     def to_dict(self) -> dict:
-        return {
-            "id": self.id,
+        """
+        轉換為字典
+        注意: 當 id 為 None 時不包含在字典中,讓 Supabase 自動生成
+        """
+        data = {
             "user_id": self.user_id,
             "name": self.name,
             "category": self.category,
@@ -46,6 +49,12 @@ class ClothingItem:
             "image_url": self.image_url,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
+        
+        # 只有當 id 不為 None 時才包含(用於更新操作)
+        if self.id is not None:
+            data["id"] = self.id
+        
+        return data
     
     @classmethod
     def from_dict(cls, data: dict) -> 'ClothingItem':
