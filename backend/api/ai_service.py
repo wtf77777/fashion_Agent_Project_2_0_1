@@ -71,10 +71,28 @@ class AIService:
             response = self.model.generate_content(content_parts)
             
             # 清理並解析回應
-            clean_text = response.text.strip()
-            clean_text = clean_text.replace('```json', '').replace('```', '').strip()
+            raw_text = response.text
+            clean_text = raw_text.strip()
             
-            tags_list = json.loads(clean_text)
+            # 移除 Markdown code block 標記
+            if "```json" in clean_text:
+                clean_text = clean_text.split("```json")[1]
+            if "```" in clean_text:
+                clean_text = clean_text.split("```")[0]
+            
+            clean_text = clean_text.strip()
+            
+            try:
+                tags_list = json.loads(clean_text)
+            except json.JSONDecodeError:
+                # 嘗試簡單的修復：找到第一個 [ 和最後一個 ]
+                start = clean_text.find('[')
+                end = clean_text.rfind(']')
+                if start != -1 and end != -1:
+                    clean_text = clean_text[start:end+1]
+                    tags_list = json.loads(clean_text)
+                else:
+                    raise
             
             # 驗證回應
             if not isinstance(tags_list, list):
@@ -95,10 +113,13 @@ class AIService:
             return tags_list
             
         except json.JSONDecodeError as e:
-            print(f"JSON 解析錯誤: {str(e)}")
+            print(f"[ERROR] JSON 解析錯誤: {str(e)}")
+            print(f"[DEBUG] AI 原始回應: {raw_text if 'raw_text' in locals() else 'No response text'}")
             return None
         except Exception as e:
-            print(f"批次 AI 標籤失敗: {str(e)}")
+            print(f"[ERROR] 批次 AI 標籤失敗: {str(e)}")
+            if 'raw_text' in locals():
+                print(f"[DEBUG] AI 原始回應: {raw_text}")
             return None
     
     def generate_outfit_recommendation(
