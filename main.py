@@ -39,6 +39,8 @@ weather_service = WeatherService(config.weather_api_key)
 wardrobe_service = WardrobeService(supabase_client)
 
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
+app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
+app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 
 @app.get("/")
 async def read_root():
