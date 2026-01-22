@@ -1,6 +1,6 @@
 """
 天氣服務層
-處理天氣資料獲取與快取
+處理天氣資料獲取與快取 - 使用台灣中央氣象署 API
 """
 import requests
 from datetime import datetime, timedelta
@@ -15,10 +15,10 @@ class WeatherService:
     
     def get_weather(self, city: str) -> Optional[WeatherData]:
         """
-        獲取天氣資料(含快取機制)
+        獲取天氣資料(含快取機制) - 使用中央氣象署 API
         
         Args:
-            city: 城市英文名稱
+            city: 城市名稱 (例如: 臺北市, 高雄市)
             
         Returns:
             WeatherData 或 None
@@ -31,26 +31,52 @@ class WeatherService:
         
         # 獲取新資料
         try:
-            url = f"http://api.openweathermap.org/data/2.5/weather"
+            # 中央氣象署開放資料平台 API
+            url = "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001"
             params = {
-                "q": city,
-                "appid": self.api_key,
-                "units": "metric",
-                "lang": "zh_tw"
+                "Authorization": self.api_key,
+                "StationName": city.replace("市", "").replace("縣", "")  # 移除「市」或「縣」字
             }
             
-            response = requests.get(url, params=params, timeout=5)
+            response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
             
-            if 'main' not in data:
+            # 檢查回應格式
+            if not data.get('success'):
                 print(f"天氣 API 回應異常: {data}")
                 return None
             
+            # 解析資料 - 使用正確的結構
+            records = data.get('records', {})
+            stations = records.get('Station', [])
+            
+            if not stations:
+                print(f"找不到城市 {city} 的氣象站資料")
+                return None
+            
+            # 取第一個氣象站的資料
+            station = stations[0]
+            weather_element = station.get('WeatherElement', {})
+            
+            # 提取溫度和天氣描述
+            temp = float(weather_element.get('AirTemperature', 0))
+            humidity = float(weather_element.get('RelativeHumidity', 0))
+            weather_desc = weather_element.get('Weather', '晴')
+            
+            # 計算體感溫度 (簡化版熱指數公式)
+            # 當溫度高於26度且濕度高時,體感溫度會上升
+            if temp > 26 and humidity > 60:
+                feels_like = temp + ((humidity - 60) / 100) * 3
+            elif temp < 10:  # 低溫時考慮風寒效應
+                feels_like = temp - 2
+            else:
+                feels_like = temp
+            
             weather_data = WeatherData(
-                temp=data['main']['temp'],
-                feels_like=data['main']['feels_like'],
-                desc=data['weather'][0]['description'],
+                temp=temp,
+                feels_like=round(feels_like, 1),
+                desc=weather_desc,
                 city=city,
                 update_time=datetime.now()
             )
@@ -65,6 +91,9 @@ class WeatherService:
             return None
         except requests.exceptions.RequestException as e:
             print(f"天氣 API 請求失敗: {str(e)}")
+            return None
+        except (KeyError, ValueError, IndexError) as e:
+            print(f"天氣資料解析失敗: {str(e)}")
             return None
         except Exception as e:
             print(f"天氣資料處理失敗: {str(e)}")
