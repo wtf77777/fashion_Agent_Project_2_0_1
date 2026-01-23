@@ -14,7 +14,28 @@ class AIService:
         self.rate_limit_seconds = rate_limit_seconds
         self.last_request_time = 0
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        # 設定安全過濾 (關閉以避免誤判衣物圖片)
+        self.safety_settings = [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_NONE"
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_NONE"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_NONE"
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_NONE"
+            }
+        ]
+        
+        # 使用穩定版本 1.5-flash
+        self.model = genai.GenerativeModel('gemini-1.5-flash', safety_settings=self.safety_settings)
     
     def _rate_limit_wait(self):
         """API 速率限制保護"""
@@ -78,7 +99,20 @@ class AIService:
             print(f"[AI] 收到 API 回應")
             
             # 清理並解析回應
-            raw_text = response.text
+            try:
+                raw_text = response.text
+            except ValueError:
+                # 處理產生內容被阻擋或為空的情況
+                print(f"[AI] 警告: response.text 無法存取 (可能被安全設定阻擋或無內容)")
+                print(f"[AI] Finish Reason: {response.candidates[0].finish_reason if response.candidates else 'Unknown'}")
+                print(f"[AI] Safety Ratings: {response.prompt_feedback}")
+                
+                # 嘗試從 parts 提取 (如果有的話)
+                if response.candidates and response.candidates[0].content.parts:
+                    raw_text = response.candidates[0].content.parts[0].text
+                else:
+                    raise ValueError("AI 回應為空，無法解析")
+            
             print(f"[AI] 原始回應長度: {len(raw_text)} 字元")
             print(f"[AI] 原始回應前 200 字元: {raw_text[:200]}")
             
