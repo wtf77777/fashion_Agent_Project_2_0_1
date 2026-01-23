@@ -171,7 +171,7 @@ const API = {
 const ImageUtils = {
     // 壓縮圖片
     // 壓縮圖片
-    async compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+    async compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.6) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
 
