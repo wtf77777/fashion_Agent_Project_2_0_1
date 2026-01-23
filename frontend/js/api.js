@@ -169,17 +169,42 @@ const API = {
 
 // ========== 圖片處理工具 ==========
 const ImageUtils = {
-    // 壓縮圖片
-    // 壓縮圖片
+    // 壓縮圖片: 模擬「截圖邏輯」，先處理格式相容性，再強制縮小解析度
     async compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.6) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
+        return new Promise(async (resolve, reject) => {
+            let currentFile = file;
+            const originalSize = file.size;
 
+            // 1. 處理 iPhone HEIC 格式轉換 (虛擬截圖的第一步：格式轉正)
+            const fileName = file.name.toLowerCase();
+            const isHeic = fileName.endsWith('.heic') || fileName.endsWith('.heif') || file.type === 'image/heic';
+
+            if (isHeic && typeof heic2any === 'function') {
+                try {
+                    console.log(`[HEIC 轉換] 偵測到手機特有格式: ${file.name}，正在進行相容性轉換...`);
+                    const blob = await heic2any({
+                        blob: file,
+                        toType: "image/jpeg",
+                        quality: 0.8
+                    });
+
+                    // 轉成 JPG File 物件
+                    currentFile = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), {
+                        type: "image/jpeg",
+                        lastModified: Date.now()
+                    });
+                    console.log(`[HEIC 轉換] 轉換完成: ${Utils.formatFileSize(currentFile.size)}`);
+                } catch (err) {
+                    console.warn("HEIC 轉換失敗，嘗試直接讀取:", err);
+                }
+            }
+
+            // 2. 執行「截圖式縮圖」邏輯 (透過 Canvas 強制降解析度)
+            const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
 
                 img.onload = () => {
-                    // ... (保持原有的 canvas 邏輯不變，為了節省 tokens 這裡縮略，實際替換時請保留 canvas 繪圖部分)
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
@@ -204,29 +229,36 @@ const ImageUtils = {
 
                     canvas.toBlob((blob) => {
                         if (!blob) {
-                            alert(`圖片壓縮失敗: ${file.name}`);
+                            alert(`圖片處理失敗: ${currentFile.name}`);
                             reject(new Error("Canvas toBlob failed"));
                             return;
                         }
-                        resolve(new File([blob], file.name, {
+
+                        const finalFile = new File([blob], currentFile.name, {
                             type: 'image/jpeg',
                             lastModified: Date.now()
-                        }));
+                        });
+
+                        const finalSize = finalFile.size;
+                        const reduction = ((originalSize - finalSize) / originalSize * 100).toFixed(1);
+                        console.log(`[截圖壓縮完成] ${file.name}: ${Utils.formatFileSize(originalSize)} -> ${Utils.formatFileSize(finalSize)} (縮減率: ${reduction}%)`);
+
+                        resolve(finalFile);
                     }, 'image/jpeg', quality);
                 };
 
                 img.onerror = (e) => {
-                    alert(`圖片載入失敗: ${file.name}。可能是格式不支援 (例如 HEIC)。`);
+                    alert(`圖片載入失敗: ${file.name}。請嘗試手動截圖後再上傳。`);
                     reject(new Error("Image load failed"));
                 };
                 img.src = e.target.result;
             };
 
             reader.onerror = (e) => {
-                alert(`讀取圖片失敗: ${file.name}`);
+                alert(`檔案讀取失敗: ${file.name}`);
                 reject(new Error("FileReader failed"));
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(currentFile);
         });
     },
 
