@@ -70,6 +70,7 @@ const UploadUI = {
                 }
             } catch (error) {
                 Toast.error(`${file.name}: ${error.message}`);
+                alert(`文件錯誤: ${file.name}\n${error.message}`); // 手機偵錯用
             }
         }
 
@@ -220,7 +221,9 @@ const UploadUI = {
 
         } catch (error) {
             console.error('上傳錯誤:', error);
-            Toast.error('上傳失敗: ' + error.message);
+            const msg = '上傳失敗: ' + error.message;
+            Toast.error(msg);
+            alert(msg); // 手機偵錯用: 強制彈出視窗
         } finally {
             AppState.setLoading(false);
         }
