@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="AI 智慧衣櫥管理系統">
     <title>🌟 AI 時尚顧問</title>
-    
+
     <!-- CSS -->
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/upload.css">
     <link rel="stylesheet" href="/static/css/wardrobe.css">
     <link rel="stylesheet" href="/static/css/recommendation.css">
 </head>
+
 <body>
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">
@@ -127,7 +129,7 @@
                 <!-- Upload Page -->
                 <div id="upload-page" class="page-content active">
                     <h2>上傳新衣到雲端</h2>
-                    
+
                     <div id="upload-actions" style="display: none;">
                         <div class="upload-stats">
                             <span id="upload-count">已選擇 0 張照片</span>
@@ -136,12 +138,13 @@
                             🚀 批量辨識並上傳全部
                         </button>
                     </div>
-                    
+
                     <div class="upload-zone" id="upload-zone">
-                        <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/jpg" style="display: none;">
+                        <input type="file" id="file-input" multiple accept="image/jpeg,image/png,image/jpg"
+                            style="display: none;">
                         <div class="upload-placeholder" id="upload-placeholder">
                             <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
                             </svg>
                             <p>拖曳圖片到這裡，或點擊選擇文件</p>
                             <small>支援 JPG, PNG (建議 5-10 張)</small>
@@ -149,7 +152,7 @@
                         <div class="upload-preview" id="upload-preview" style="display: none;"></div>
                     </div>
 
-                    
+
 
                     <div class="info-box">
                         <h4>📌 使用提示:</h4>
@@ -166,7 +169,7 @@
                 <!-- Wardrobe Page -->
                 <div id="wardrobe-page" class="page-content">
                     <h2>我的雲端衣櫥</h2>
-                    
+
                     <div class="wardrobe-actions">
                         <button id="refresh-wardrobe-btn" class="btn btn-secondary">
                             🔄 重新整理
@@ -174,6 +177,16 @@
                         <button id="batch-delete-btn" class="btn btn-secondary">
                             🗑️ 批量刪除
                         </button>
+                    </div>
+
+                    <!-- 分類過濾按鈕 -->
+                    <div class="wardrobe-filters">
+                        <button class="filter-btn active" data-filter="all">全部</button>
+                        <button class="filter-btn" data-filter="上衣">上衣</button>
+                        <button class="filter-btn" data-filter="下身">下身</button>
+                        <button class="filter-btn" data-filter="外套">外套</button>
+                        <button class="filter-btn" data-filter="鞋子">鞋子</button>
+                        <button class="filter-btn" data-filter="配件">配件</button>
                     </div>
 
                     <div id="wardrobe-stats" class="stats-grid">
@@ -195,7 +208,7 @@
                 <!-- Recommendation Page -->
                 <div id="recommendation-page" class="page-content">
                     <h2>今日穿搭推薦</h2>
-                    
+
                     <div class="recommendation-form">
                         <div class="form-row">
                             <div class="form-group">
@@ -244,7 +257,7 @@
                     <div id="recommendation-result" class="recommendation-result" style="display: none;">
                         <h3>🎨 今日穿搭建議</h3>
                         <div id="recommendation-text" class="recommendation-text"></div>
-                        
+
                         <h3>👔 推薦單品展示</h3>
                         <div id="recommendation-items" class="recommendation-carousel">
                             <!-- Items will be loaded here -->
@@ -270,4 +283,5 @@
     <script src="/static/js/recommendation.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
+
 </html>
