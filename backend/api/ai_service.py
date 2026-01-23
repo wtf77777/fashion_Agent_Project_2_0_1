@@ -35,7 +35,7 @@ class AIService:
         ]
         
         # 使用穩定版本 1.5-flash
-        self.model = genai.GenerativeModel('gemini-1.5-flash', safety_settings=self.safety_settings)
+        self.model = genai.GenerativeModel('gemini-2.5-flash', safety_settings=self.safety_settings)
     
     def _rate_limit_wait(self):
         """API 速率限制保護"""
