@@ -38,9 +38,18 @@ class AIService:
         ]
         
         # 使用使用者指定的版本 2.5-flash
-        self.model = genai.GenerativeModel('gemini-3-flash-preview', safety_settings=self.safety_settings)
+        self.model = genai.GenerativeModel('gemini-2.5-flash', safety_settings=self.safety_settings)
     
-    # ... (skipping _rate_limit_wait) ...
+    def _rate_limit_wait(self):
+        """API 速率限制保護"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        
+        if time_since_last < self.rate_limit_seconds:
+            wait_time = self.rate_limit_seconds - time_since_last
+            time.sleep(wait_time)
+        
+        self.last_request_time = time.time()
 
     def batch_auto_tag(self, img_bytes_list: List[bytes]) -> Optional[List[Dict]]:
         # ... (skipping docstring) ...
