@@ -12,6 +12,45 @@
     flex: 1;
 }
 
+
+/* 過濾按鈕區 */
+.wardrobe-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+    padding: var(--spacing-sm);
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.filter-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 0.8rem 1.5rem;
+    border: 2px solid var(--gray-200);
+    background: white;
+    color: var(--gray-700);
+    border-radius: var(--radius-full);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+    transform: translateY(-2px);
+}
+
+.filter-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+}
+
 /* 統計網格 */
 .stats-grid {
     display: grid;
