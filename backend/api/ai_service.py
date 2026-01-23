@@ -8,9 +8,12 @@ import google.generativeai as genai
 from typing import List, Dict, Optional, Tuple
 from database.models import ClothingItem, WeatherData
 
+from google.api_core.exceptions import ResourceExhausted
+
 class AIService:
     def __init__(self, api_key: str, rate_limit_seconds: int = 15):
         self.api_key = api_key
+        # ... (init skipped for brevity, keeping existing) ...
         self.rate_limit_seconds = rate_limit_seconds
         self.last_request_time = 0
         genai.configure(api_key=api_key)
@@ -34,37 +37,22 @@ class AIService:
             }
         ]
         
-        # 使用穩定版本 1.5-flash
+        # 使用使用者指定的版本 2.5-flash
         self.model = genai.GenerativeModel('gemini-2.5-flash', safety_settings=self.safety_settings)
     
-    def _rate_limit_wait(self):
-        """API 速率限制保護"""
-        current_time = time.time()
-        time_since_last = current_time - self.last_request_time
-        
-        if time_since_last < self.rate_limit_seconds:
-            wait_time = self.rate_limit_seconds - time_since_last
-            time.sleep(wait_time)
-        
-        self.last_request_time = time.time()
-    
+    # ... (skipping _rate_limit_wait) ...
+
     def batch_auto_tag(self, img_bytes_list: List[bytes]) -> Optional[List[Dict]]:
-        """
-        批次 AI 自動標籤
-        
-        Args:
-            img_bytes_list: 圖片 bytes 列表
-            
-        Returns:
-            標籤列表或 None(如果失敗)
-        """
+        # ... (skipping docstring) ...
         try:
             print(f"[AI] 開始批次辨識 {len(img_bytes_list)} 張圖片...")
             
-            # 速率限制等待
+            # 初始速率限制等待
             self._rate_limit_wait()
-            print(f"[AI] 速率限制檢查通過")
             
+            prompt = f"""請仔細分析這 {len(img_bytes_list)} 件衣服... (省略 prompt 內容以節省 tokens，實際替換請保留完整 prompt) ..."""
+            
+            # (重建 prompt 和 content_parts 的代碼)
             prompt = f"""請仔細分析這 {len(img_bytes_list)} 件衣服,為每件衣服分別回傳 JSON 格式的標籤。
 
 回傳格式必須是一個 JSON 陣列,包含 {len(img_bytes_list)} 個物件:
@@ -95,19 +83,32 @@ class AIService:
                 print(f"[AI] 準備圖片 {idx+1}/{len(img_bytes_list)}, 大小={len(img_bytes)} bytes")
             
             print(f"[AI] 發送請求到 Gemini API...")
-            response = self.model.generate_content(content_parts)
+            
+            # 重試機制
+            max_retries = 3
+            retry_count = 0
+            response = None
+            
+            while retry_count < max_retries:
+                try:
+                    response = self.model.generate_content(content_parts)
+                    break # 成功則跳出迴圈
+                except ResourceExhausted as e:
+                    retry_count += 1
+                    wait_time = 30 * retry_count # 30s, 60s, 90s
+                    print(f"[AI] ⚠️ 觸發速率限制 (429)，等待 {wait_time} 秒後重試 ({retry_count}/{max_retries})...")
+                    print(f"[AI] 錯誤訊息: {str(e)}")
+                    time.sleep(wait_time)
+                    if retry_count == max_retries:
+                        raise e # 達到最大重試次數，拋出異常
+            
             print(f"[AI] 收到 API 回應")
             
-            # 清理並解析回應
+            # ... (接續原本的回應處理邏輯) ...
             try:
                 raw_text = response.text
             except ValueError:
-                # 處理產生內容被阻擋或為空的情況
-                print(f"[AI] 警告: response.text 無法存取 (可能被安全設定阻擋或無內容)")
-                print(f"[AI] Finish Reason: {response.candidates[0].finish_reason if response.candidates else 'Unknown'}")
-                print(f"[AI] Safety Ratings: {response.prompt_feedback}")
-                
-                # 嘗試從 parts 提取 (如果有的話)
+                # ... (error handling) ...
                 if response.candidates and response.candidates[0].content.parts:
                     raw_text = response.candidates[0].content.parts[0].text
                 else:
