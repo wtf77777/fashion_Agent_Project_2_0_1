@@ -1,5 +1,6 @@
 """
 配置管理模組
+統一管理所有配置，支援環境變數和 Streamlit Secrets
 """
 import os
 from dataclasses import dataclass
