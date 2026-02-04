@@ -52,7 +52,7 @@ const API = {
     },
 
     // ========== 上傳 API ==========
-    async uploadImages(files) {
+    async uploadImages(files, warmth = '薄') {
         const formData = new FormData();
 
         files.forEach(file => {
@@ -62,8 +62,9 @@ const API = {
         const user = AppState.getUser();
         // ✅ 改這裡：傳送 UUID 而不是 BIGINT
         formData.append('user_id', user.id);
+        formData.append('warmth', warmth);
 
-        console.log(`[INFO] 上傳: user_id=${user.id}`);
+        console.log(`[INFO] 上傳: user_id=${user.id}, 預設厚度=${warmth}`);
 
         const response = await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
@@ -155,6 +156,29 @@ const API = {
         formData.append('occasion', occasion || '外出遊玩');
 
         const response = await fetch(`${API_BASE_URL}/api/recommendation`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    async updateItem(itemId, data) {
+        const user = AppState.getUser();
+        const formData = new FormData();
+        formData.append('user_id', user.id);
+        formData.append('item_id', itemId);
+        formData.append('name', data.name);
+        formData.append('category', data.category);
+        formData.append('color', data.color);
+        formData.append('style', data.style);
+        formData.append('warmth', data.warmth);
+
+        const response = await fetch(`${API_BASE_URL}/api/wardrobe/update`, {
             method: 'POST',
             body: formData
         });

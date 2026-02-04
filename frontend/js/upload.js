@@ -1,270 +1,317 @@
-// ========== 上傳頁面 UI 邏輯 ==========
+// ========== 上傳頁面 UI 邏輯 - 佇列上傳版本 ==========
 const UploadUI = {
-    selectedFiles: [],
-    uploadedFiles: new Set(),
-    maxFiles: 10,
+    tempFiles: [], // 目前選取但尚未確認的原始 File 物件
+    queue: [],     // 已確認厚度，準備批量上傳的項目
+    maxFiles: 20,
 
     init() {
+        this.cacheDOM();
         this.bindEvents();
     },
 
-    bindEvents() {
-        const uploadZone = document.getElementById('upload-zone');
-        const fileInput = document.getElementById('file-input');
-        const uploadBtn = document.getElementById('batch-upload-btn');
+    cacheDOM() {
+        this.uploadZone = document.getElementById('upload-zone');
+        this.fileInput = document.getElementById('file-input');
+        this.selectBtn = document.getElementById('select-btn');
+        this.confirmBtn = document.getElementById('add-to-queue-btn');
+        this.warmthSelect = document.getElementById('batch-warmth-select');
+        this.queueGrid = document.getElementById('queue-grid');
+        this.queueCount = document.getElementById('queue-count');
+        this.batchArea = document.getElementById('batch-action-area');
+        this.batchUploadBtn = document.getElementById('batch-upload-btn');
+    },
 
-        // 點擊上傳區域打開文件選擇
-        uploadZone.addEventListener('click', (e) => {
-            if (e.target.closest('.upload-placeholder')) {
-                fileInput.click();
+    bindEvents() {
+        // 觸發檔案選取
+        [this.uploadZone, this.selectBtn].forEach(el => {
+            if (el) {
+                el.addEventListener('click', (e) => {
+                    if (e.target === this.fileInput) return;
+                    this.fileInput.click();
+                });
             }
         });
 
-        // 文件選擇
-        fileInput.addEventListener('change', (e) => {
-            this.handleFileSelect(e.target.files);
+        // 處理檔案選取
+        this.fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleFileSelect(e.target.files);
+            }
         });
 
-        // 拖放上傳
-        uploadZone.addEventListener('dragover', (e) => {
+        // 拖曳上傳
+        this.uploadZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadZone.classList.add('drag-over');
+            this.uploadZone.classList.add('drag-over');
         });
 
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('drag-over');
+        this.uploadZone.addEventListener('dragleave', () => {
+            this.uploadZone.classList.remove('drag-over');
         });
 
-        uploadZone.addEventListener('drop', (e) => {
+        this.uploadZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            uploadZone.classList.remove('drag-over');
+            this.uploadZone.classList.remove('drag-over');
             this.handleFileSelect(e.dataTransfer.files);
         });
 
-        // 批量上傳按鈕
-        uploadBtn.addEventListener('click', () => {
-            this.handleBatchUpload();
-        });
+        // 按下「確認」按鈕
+        this.confirmBtn.addEventListener('click', () => this.pushToQueue());
+
+        // 按下「開始批量辨識並上傳全部」
+        this.batchUploadBtn.addEventListener('click', () => this.handleBatchUpload());
     },
 
     handleFileSelect(files) {
         const fileArray = Array.from(files);
 
-        // 檢查數量限制
-        if (fileArray.length > this.maxFiles) {
-            Toast.error(`一次最多只能上傳 ${this.maxFiles} 張照片，您選擇了 ${fileArray.length} 張`);
-            return;
-        }
-
-        // 驗證文件
-        const validFiles = [];
-        for (const file of fileArray) {
+        // 簡單驗證
+        const validFiles = fileArray.filter(file => {
             try {
-                ImageUtils.validateImageFile(file);
-
-                // 檢查是否已上傳過
-                if (!this.uploadedFiles.has(file.name)) {
-                    validFiles.push(file);
-                } else {
-                    Toast.warning(`${file.name} 已上傳過，已自動過濾`);
-                }
-            } catch (error) {
-                Toast.error(`${file.name}: ${error.message}`);
-                alert(`文件錯誤: ${file.name}\n${error.message}`); // 手機偵錯用
+                return ImageUtils.validateImageFile(file);
+            } catch (e) {
+                console.warn(e.message);
+                return false;
             }
-        }
+        });
 
-        if (validFiles.length === 0) {
-            Toast.info('沒有有效的新文件');
+        if (validFiles.length === 0) return;
+
+        this.tempFiles = validFiles;
+
+        // 視覺回饋
+        this.selectBtn.textContent = `已選取 ${this.tempFiles.length} 張`;
+        this.selectBtn.style.background = "#e3f2fd";
+        Toast.info(`已載入 ${this.tempFiles.length} 張照片，請選擇厚度後按確認`);
+    },
+
+    /**
+     * 將暫存的圖檔正式加入「待上傳隊列」
+     */
+    async pushToQueue() {
+        if (this.tempFiles.length === 0) {
+            Toast.warning("請先上傳或選取照片");
             return;
         }
 
-        this.selectedFiles = validFiles;
-        this.renderPreview();
-        this.showUploadActions();
-    },
-
-    renderPreview() {
-        const preview = document.getElementById('upload-preview');
-        const placeholder = document.getElementById('upload-placeholder');
-
-        placeholder.style.display = 'none';
-        preview.style.display = 'grid';
-        preview.innerHTML = '';
-
-        this.selectedFiles.forEach((file, index) => {
-            const previewItem = document.createElement('div');
-            previewItem.className = 'preview-item';
-
-            const img = document.createElement('img');
-            img.src = ImageUtils.createPreviewURL(file);
-            img.alt = file.name;
-
-            const info = document.createElement('div');
-            info.className = 'preview-info';
-
-            const name = document.createElement('p');
-            name.className = 'preview-name';
-            name.textContent = file.name;
-
-            const size = document.createElement('p');
-            size.className = 'preview-size';
-            size.textContent = Utils.formatFileSize(file.size);
-
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'preview-remove';
-            removeBtn.innerHTML = '×';
-            removeBtn.onclick = () => this.removeFile(index);
-
-            info.appendChild(name);
-            info.appendChild(size);
-            previewItem.appendChild(img);
-            previewItem.appendChild(info);
-            previewItem.appendChild(removeBtn);
-            preview.appendChild(previewItem);
-        });
-    },
-
-    removeFile(index) {
-        const file = this.selectedFiles[index];
-        const url = document.querySelectorAll('.preview-item img')[index].src;
-        ImageUtils.revokePreviewURL(url);
-
-        this.selectedFiles.splice(index, 1);
-
-        if (this.selectedFiles.length === 0) {
-            this.hideUploadActions();
-            document.getElementById('upload-placeholder').style.display = 'flex';
-            document.getElementById('upload-preview').style.display = 'none';
-        } else {
-            this.renderPreview();
-            this.updateUploadCount();
-        }
-    },
-
-    showUploadActions() {
-        document.getElementById('upload-actions').style.display = 'block';
-        this.updateUploadCount();
-    },
-
-    hideUploadActions() {
-        document.getElementById('upload-actions').style.display = 'none';
-    },
-
-    updateUploadCount() {
-        document.getElementById('upload-count').textContent =
-            `已選擇 ${this.selectedFiles.length} 張照片`;
-    },
-
-    async handleBatchUpload() {
-        if (this.selectedFiles.length === 0) {
-            Toast.warning('請先選擇要上傳的圖片');
+        const warmth = this.warmthSelect.value;
+        if (!warmth) {
+            Toast.warning("請選擇這批衣服的厚薄程度");
             return;
         }
 
         AppState.setLoading(true);
 
         try {
-            // 壓縮圖片
-            Toast.info('正在壓縮圖片...');
-            const compressedFiles = await Promise.all(
-                this.selectedFiles.map(file => ImageUtils.compressImage(file))
-            );
+            for (const file of this.tempFiles) {
+                // 為了即時顯示，先做一個預覽 URL
+                const previewUrl = URL.createObjectURL(file);
 
-            // 上傳
-            Toast.info(`正在上傳 ${compressedFiles.length} 張圖片...`);
-            const result = await API.uploadImages(compressedFiles);
+                const item = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    file: file,
+                    previewUrl: previewUrl,
+                    warmth: warmth,
+                    isEditing: false
+                };
 
-            if (result.success) {
-                // 記錄已上傳的文件
-                this.selectedFiles.forEach(file => {
-                    this.uploadedFiles.add(file.name);
-                });
+                this.queue.push(item);
+            }
 
-                // 清空當前選擇
-                this.selectedFiles = [];
+            // 重置上方控制項
+            this.tempFiles = [];
+            this.fileInput.value = '';
+            this.selectBtn.textContent = '上傳照片';
+            this.selectBtn.style.background = '';
+            this.warmthSelect.selectedIndex = 0;
 
-                // 重置 UI
-                document.getElementById('upload-placeholder').style.display = 'flex';
-                document.getElementById('upload-preview').style.display = 'none';
-                this.hideUploadActions();
+            this.renderQueue();
+            Toast.success("已加入待上傳隊列");
+        } catch (error) {
+            console.error(error);
+            Toast.error("加入隊列失敗");
+        } finally {
+            AppState.setLoading(false);
+        }
+    },
 
-                // 清空文件輸入
-                document.getElementById('file-input').value = '';
+    /**
+     * 渲染下方的隊列列表
+     */
+    renderQueue() {
+        this.queueGrid.innerHTML = '';
+        this.queueCount.textContent = this.queue.length;
 
-                // 顯示結果
-                Toast.success(`🎉 成功上傳 ${result.success_count} 件衣服！`);
+        if (this.queue.length === 0) {
+            this.queueGrid.innerHTML = '<div class="queue-empty-msg">目前沒有等待上傳的衣服</div>';
+            this.batchArea.style.display = 'none';
+            return;
+        }
 
-                if (result.duplicate_count > 0) {
-                    Toast.warning(`已過濾 ${result.duplicate_count} 件重複衣服`);
-                }
+        this.batchArea.style.display = 'block';
 
-                if (result.fail_count > 0) {
-                    Toast.error(`${result.fail_count} 件上傳失敗`);
+        this.queue.forEach(item => {
+            const el = document.createElement('div');
+            el.className = 'queue-item';
 
-                    // 顯示失敗詳情
-                    if (result.fail_details && result.fail_details.length > 0) {
-                        console.error('上傳失敗詳情:', result.fail_details);
-                        Toast.error(`失敗原因: ${result.fail_details.join('; ')}`);
-                    }
-                }
-
-                // 顯示詳細結果
-                if (result.items && result.items.length > 0) {
-                    this.showUploadResults(result.items);
-                }
-
+            if (item.isEditing) {
+                el.innerHTML = `
+                    <div class="item-left">
+                        <img class="item-thumbnail" src="${item.previewUrl}">
+                        <div class="item-meta">
+                            <span class="item-name">${item.file.name}</span>
+                            <select class="warmth-select-small" onchange="UploadUI.updateItemWarmth('${item.id}', this.value)">
+                                <option value="薄" ${item.warmth === '薄' ? 'selected' : ''}>極薄</option>
+                                <option value="適中" ${item.warmth === '適中' ? 'selected' : ''}>中等</option>
+                                <option value="厚" ${item.warmth === '厚' ? 'selected' : ''}>極厚</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn-text-save" onclick="UploadUI.toggleEdit('${item.id}')">儲存</button>
+                    </div>
+                `;
             } else {
-                Toast.error(result.message || '上傳失敗');
-                console.error('上傳失敗:', result);
+                el.innerHTML = `
+                    <div class="item-left">
+                        <img class="item-thumbnail" src="${item.previewUrl}">
+                        <div class="item-meta">
+                            <span class="item-name">${item.file.name}</span>
+                            <span class="item-tag warmth-tag-${item.warmth}">極${item.warmth}</span>
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn-icon" onclick="UploadUI.toggleEdit('${item.id}')" title="編輯厚度">✎</button>
+                        <button class="btn-icon" onclick="UploadUI.removeFromQueue('${item.id}')" title="刪除">✕</button>
+                    </div>
+                `;
+            }
+            this.queueGrid.appendChild(el);
+        });
+    },
+
+    toggleEdit(id) {
+        const item = this.queue.find(i => i.id === id);
+        if (item) {
+            item.isEditing = !item.isEditing;
+            this.renderQueue();
+        }
+    },
+
+    updateItemWarmth(id, value) {
+        const item = this.queue.find(i => i.id === id);
+        if (item) item.warmth = value;
+    },
+
+    removeFromQueue(id) {
+        const index = this.queue.findIndex(i => i.id === id);
+        if (index > -1) {
+            // 釋放記憶體
+            URL.revokeObjectURL(this.queue[index].previewUrl);
+            this.queue.splice(index, 1);
+            this.renderQueue();
+        }
+    },
+
+    /**
+     * 執行最後的上傳 (呼叫後端 API)
+     */
+    async handleBatchUpload() {
+        if (this.queue.length === 0) return;
+
+        AppState.setLoading(true);
+        const startTime = Date.now();
+
+        try {
+            // 由於 API 目前設計是一次上傳一批並帶入一個 warmth 值，
+            // 為了支援「每件衣服不同厚度」，我們需要分組上傳，或者修改後端。
+            // 這裡採用「分組上傳」策略，將相同厚度的衣服打包在一起發送，以減少 API 呼叫次數（Gemini 批次）。
+
+            const groups = {
+                '薄': this.queue.filter(i => i.warmth === '薄'),
+                '適中': this.queue.filter(i => i.warmth === '適中'),
+                '厚': this.queue.filter(i => i.warmth === '厚')
+            };
+
+            let totalSuccess = 0;
+            let totalFail = 0;
+            const allItems = [];
+
+            for (const [warmthKey, items] of Object.entries(groups)) {
+                if (items.length === 0) continue;
+
+                Toast.info(`正在處理「極${warmthKey}」類別 (${items.length} 件)...`);
+
+                // 1. 圖片壓縮
+                const compressedFiles = await Promise.all(
+                    items.map(item => ImageUtils.compressImage(item.file))
+                );
+
+                // 2. 上傳到後端
+                const result = await API.uploadImages(compressedFiles, warmthKey);
+
+                if (result.success) {
+                    totalSuccess += (result.success_count || 0);
+                    totalFail += (result.fail_count || 0);
+                    if (result.items) allItems.push(...result.items);
+                } else {
+                    totalFail += items.length;
+                    console.error(`類別 ${warmthKey} 上傳失敗:`, result.message);
+                }
+            }
+
+            // 清空隊列
+            this.queue.forEach(i => URL.revokeObjectURL(i.previewUrl));
+            this.queue = [];
+            this.renderQueue();
+
+            // 顯示最終結果
+            const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+            Toast.success(`🎉 任務完成！成功: ${totalSuccess}, 失敗: ${totalFail} (耗時 ${duration}s)`);
+
+            if (allItems.length > 0) {
+                this.showUploadResults(allItems);
             }
 
         } catch (error) {
-            console.error('上傳錯誤:', error);
-            const msg = '上傳失敗: ' + error.message;
-            Toast.error(msg);
-            alert(msg); // 手機偵錯用: 強制彈出視窗
+            console.error('上傳過程出錯:', error);
+            Toast.error('上傳失敗: ' + error.message);
         } finally {
             AppState.setLoading(false);
         }
     },
 
     showUploadResults(items) {
-        // 在頁面上顯示上傳結果
+        // 重用原本的呈現邏輯，但增加動畫
         const resultsHTML = `
-            <div class="upload-results">
-                <h3>✅ 上傳成功的衣服</h3>
-                <div class="results-grid">
+            <div class="upload-results" style="margin-top: 20px; border-left: 4px solid var(--success); background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                <h3 style="margin-bottom: 15px;">✅ 剛加入衣櫥的衣服</h3>
+                <div class="results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px;">
                     ${items.map(item => `
-                        <div class="result-item">
-                            <p class="result-name">${item.name}</p>
-                            <p class="result-category">${item.category} | ${item.color}</p>
-                            <p class="result-warmth">${'🔥'.repeat(item.warmth)}</p>
+                        <div class="result-item" style="background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
+                            <p style="font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</p>
+                            <p style="font-size: 0.8rem; color: #666;">${item.category} | ${item.color}</p>
                         </div>
                     `).join('')}
                 </div>
             </div>
         `;
 
-        // 插入到上傳區域下方
-        const resultsContainer = document.createElement('div');
-        resultsContainer.innerHTML = resultsHTML;
-
-        const uploadZone = document.getElementById('upload-zone');
+        const stagingSection = document.querySelector('.queue-section');
         const existingResults = document.querySelector('.upload-results');
-        if (existingResults) {
-            existingResults.remove();
-        }
-        uploadZone.after(resultsContainer.firstElementChild);
+        if (existingResults) existingResults.remove();
 
-        // 3秒後自動淡出
+        const div = document.createElement('div');
+        div.innerHTML = resultsHTML;
+        stagingSection.after(div.firstElementChild);
+
         setTimeout(() => {
-            const results = document.querySelector('.upload-results');
-            if (results) {
-                results.style.transition = 'opacity 0.5s';
-                results.style.opacity = '0';
-                setTimeout(() => results.remove(), 500);
+            const res = document.querySelector('.upload-results');
+            if (res) {
+                res.style.transition = 'opacity 1s';
+                res.style.opacity = '0';
+                setTimeout(() => res.remove(), 1000);
             }
-        }, 5000);
+        }, 8000);
     }
 };

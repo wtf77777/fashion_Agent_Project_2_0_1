@@ -37,6 +37,23 @@ const WardrobeUI = {
                 this.setFilter(filter);
             });
         });
+
+        // ✅ 監聽編輯表單預設提交
+        const editForm = document.getElementById('edit-form');
+        if (editForm) {
+            editForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleUpdateItem();
+            });
+        }
+
+        // 監聽關閉編輯 Modal 按鈕
+        const closeEditModalBtn = document.getElementById('close-edit-modal-btn');
+        if (closeEditModalBtn) {
+            closeEditModalBtn.addEventListener('click', () => {
+                this.closeEditModal();
+            });
+        }
     },
 
     // ========== 過濾功能 ==========
@@ -216,14 +233,17 @@ const WardrobeUI = {
         const card = document.createElement('div');
         card.className = 'wardrobe-item';
         card.dataset.itemId = item.id;
+        // ✅ 點擊卡片觸發編輯 Modal (強制使用 WardrobeUI 引用)
+        card.onclick = () => WardrobeUI.openEditModal(item.id);
+
 
         let checkboxHTML = '';
         if (this.isBatchDeleteMode) {
             const isSelected = this.selectedItems.has(item.id);
             checkboxHTML = `
                 <div class="item-checkbox">
-                    <input type="checkbox" 
-                           id="check-${item.id}" 
+                    <input type="checkbox"
+                           id="check-${item.id}"
                            ${isSelected ? 'checked' : ''}
                            onchange="WardrobeUI.toggleItemSelection(${item.id})">
                     <label for="check-${item.id}">選擇</label>
@@ -258,7 +278,7 @@ const WardrobeUI = {
                 </div>
                 ${!this.isBatchDeleteMode ? `
                     <button class="btn btn-secondary btn-delete" 
-                            onclick="WardrobeUI.deleteItem(${item.id})"
+                            onclick="event.stopPropagation(); WardrobeUI.deleteItem(${item.id})"
                             data-item-id="${item.id}">
                         🗑️ 刪除
                     </button>
@@ -376,6 +396,58 @@ const WardrobeUI = {
         } catch (error) {
             console.error('批量刪除錯誤:', error);
             Toast.error('批量刪除失敗: ' + error.message);
+        } finally {
+            AppState.setLoading(false);
+        }
+    },
+
+    // ✅ Oreoooooo 新增: 編輯 Modal 控制
+    openEditModal(itemId) {
+        const item = this.items.find(i => i.id === itemId);
+        if (!item) {
+            console.error('找不到衣物 ID:', itemId);
+            return;
+        }
+
+        document.getElementById('edit-item-id').value = item.id;
+        document.getElementById('edit-name').value = item.name || '';
+        document.getElementById('edit-category').value = item.category || '上衣';
+        document.getElementById('edit-color').value = item.color || '';
+        document.getElementById('edit-style').value = item.style || '';
+        document.getElementById('edit-warmth').value = item.warmth || 5;
+
+        document.getElementById('edit-modal').style.display = 'flex';
+        console.log('📝 開啟編輯 Modal:', item.name);
+    },
+
+    closeEditModal() {
+        document.getElementById('edit-modal').style.display = 'none';
+        console.log('❌ 關閉編輯 Modal');
+    },
+
+    async handleUpdateItem() {
+        const itemId = document.getElementById('edit-item-id').value;
+        const data = {
+            name: document.getElementById('edit-name').value,
+            category: document.getElementById('edit-category').value,
+            color: document.getElementById('edit-color').value,
+            style: document.getElementById('edit-style').value,
+            warmth: parseInt(document.getElementById('edit-warmth').value) || 5
+        };
+
+        AppState.setLoading(true);
+        try {
+            const result = await API.updateItem(itemId, data);
+            if (result.success) {
+                Toast.success('✅ 修改成功！');
+                this.closeEditModal();
+                await this.loadWardrobe(); // 重新載入衣櫥
+            } else {
+                Toast.error('修改失敗: ' + (result.message || '未知錯誤'));
+            }
+        } catch (error) {
+            console.error('更新錯誤:', error);
+            Toast.error('網路連線失敗');
         } finally {
             AppState.setLoading(false);
         }

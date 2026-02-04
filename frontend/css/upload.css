@@ -1,207 +1,273 @@
+/* ========== 基於 img.png 的動態上傳卡片樣式 ========== */
 
-/* ========== 上傳頁面樣式 ========== */
+:root {
+    --card-bg: #ffffff;
+    --upload-border: #efefef;
+    --primary-blue: #4a90e2;
+    --text-main: #333333;
+}
 
-/* 上傳區域 */
-.upload-zone {
-    background: white;
-    border: 3px dashed var(--gray-300);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
+/* 玻璃質感/陰影卡片 */
+.card-glass {
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--upload-border);
+    padding: 30px;
     text-align: center;
-    transition: all 0.3s;
-    cursor: pointer;
-    min-height: 300px;
+    margin-bottom: 30px;
+}
+
+.card-title {
+    font-size: 1.2rem;
+    color: var(--text-main);
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+/* 控制列布局 */
+.upload-controls {
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
 }
 
-.upload-zone:hover {
-    border-color: var(--primary-color);
-    background: var(--gray-50);
-}
-
-.upload-zone.drag-over {
-    border-color: var(--primary-color);
-    background: rgba(102, 126, 234, 0.1);
-    transform: scale(1.02);
-}
-
-/* 上傳佔位符 */
-.upload-placeholder {
+.upload-dropzone {
+    border: 1px dashed #cccccc;
+    background: #fcfcfc;
+    border-radius: 8px;
+    padding: 15px 30px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--spacing-md);
-    color: var(--gray-600);
-}
-
-.upload-placeholder svg {
-    color: var(--gray-400);
-}
-
-.upload-placeholder p {
-    font-size: 1.1rem;
-    margin: 0;
-}
-
-.upload-placeholder small {
-    color: var(--gray-500);
-}
-
-/* 圖片預覽網格 */
-.upload-preview {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: var(--spacing-md);
-    width: 100%;
-}
-
-.preview-item {
-    position: relative;
-    background: white;
-    border: 2px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    overflow: hidden;
+    cursor: pointer;
+    min-width: 150px;
     transition: all 0.3s;
 }
 
-.preview-item:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary-color);
+.upload-dropzone:hover {
+    border-color: var(--primary-blue);
+    background: #f0f7ff;
 }
 
-.preview-item img {
-    width: 100%;
-    height: 150px;
-    object-fit: cover;
+.plus-icon {
+    font-size: 2rem;
+    color: #cccccc;
+    margin-bottom: 5px;
 }
 
-.preview-info {
-    padding: var(--spacing-xs);
-    background: var(--gray-50);
+.btn-ghost {
+    background: #f5f5f5;
+    border: 1px solid #eeeeee;
+    padding: 6px 15px;
+    border-radius: 4px;
+    color: #666;
+    cursor: pointer;
 }
 
-.preview-name {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--gray-800);
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.settings-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
 }
 
-.preview-size {
-    font-size: 0.75rem;
-    color: var(--gray-600);
-    margin: 0.25rem 0 0 0;
+.warmth-select {
+    padding: 8px 12px;
+    border: 1px solid #dddddd;
+    border-radius: 6px;
+    min-width: 180px;
+    background: white;
+    font-size: 0.95rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
 }
 
-.preview-remove {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    width: 28px;
-    height: 28px;
-    background: rgba(239, 68, 68, 0.9);
+.btn-confirm {
+    background: var(--primary-blue);
     color: white;
     border: none;
-    border-radius: 50%;
-    font-size: 1.5rem;
-    line-height: 1;
+    padding: 8px 25px;
+    border-radius: 6px;
     cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-confirm:hover {
+    background: #357abd;
+}
+
+/* 待上傳清單樣式 */
+.queue-section {
+    margin-top: 20px;
+}
+
+.queue-actions h3 {
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    color: var(--gray-700);
+}
+
+.queue-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.queue-empty-msg {
+    text-align: center;
+    padding: 40px;
+    color: var(--gray-400);
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+}
+
+.queue-item {
+    background: white;
+    border: 1px solid var(--upload-border);
+    border-radius: 8px;
+    padding: 12px 20px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
+    justify-content: space-between;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
 }
 
-.preview-remove:hover {
-    background: var(--error);
-    transform: scale(1.1);
+.item-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
 }
 
-/* 上傳操作區 */
-#upload-actions {
-    margin-top: var(--spacing-lg);
-    background: white;
-    padding: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
+.item-thumbnail {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: #eee;
 }
 
-.upload-stats {
-    text-align: center;
-    margin-bottom: var(--spacing-md);
-    font-size: 1.1rem;
-    color: var(--gray-700);
+.item-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.item-name {
     font-weight: 500;
+    color: #333;
 }
 
-/* 上傳結果 */
-.upload-results {
-    margin-top: var(--spacing-lg);
-    background: white;
-    padding: var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    border-left: 4px solid var(--success);
+.item-tag {
+    background: #f3f3f3;
+    padding: 2px 12px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #666;
+    width: fit-content;
 }
 
-.upload-results h3 {
-    color: var(--gray-800);
-    margin-bottom: var(--spacing-md);
+/* 標籤顏色 */
+.warmth-tag-薄 {
+    background: #e0faff;
+    color: #008fa1;
 }
 
-.results-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--spacing-md);
+.warmth-tag-適中 {
+    background: #fff4e0;
+    color: #a17300;
 }
 
-.result-item {
-    background: var(--gray-50);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--gray-200);
+.warmth-tag-厚 {
+    background: #ffe8e0;
+    color: #a13d00;
 }
 
-.result-name {
+.item-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-icon {
+    background: #f9f9f9;
+    border: 1px solid #eeeeee;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #888;
+    font-size: 1rem;
+}
+
+.btn-icon:hover {
+    background: #f0f0f0;
+}
+
+/* 儲存按鈕 */
+.btn-text-save {
+    background: var(--success);
+    color: #000000;
+    border: none;
+    padding: 6px 15px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
     font-weight: 600;
-    color: var(--gray-800);
-    margin: 0 0 0.5rem 0;
 }
 
-.result-category {
-    font-size: 0.9rem;
-    color: var(--gray-600);
-    margin: 0 0 0.5rem 0;
+.warmth-select-small {
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--primary-blue);
+    font-size: 0.85rem;
+    outline: none;
 }
 
-.result-warmth {
+/* 底部大按鈕 */
+.btn-batch-upload {
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    border-radius: 8px;
     font-size: 1.1rem;
-    margin: 0;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+    width: 100%;
 }
 
-/* 響應式設計 */
+/* 手機版適配 */
 @media (max-width: 768px) {
-    .upload-zone {
-        padding: var(--spacing-lg);
-        min-height: 200px;
+    .upload-controls {
+        flex-direction: column;
     }
-    
-    .upload-preview {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: var(--spacing-sm);
+
+    .upload-dropzone,
+    .settings-group,
+    .warmth-select,
+    .btn-confirm {
+        width: 100%;
     }
-    
-    .preview-item img {
-        height: 120px;
+
+    .item-left {
+        gap: 12px;
     }
-    
-    .results-grid {
-        grid-template-columns: 1fr;
+
+    .queue-item {
+        padding: 10px;
+    }
+
+    .item-name {
+        font-size: 0.9rem;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
