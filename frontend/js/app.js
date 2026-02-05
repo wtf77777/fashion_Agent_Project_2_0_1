@@ -177,7 +177,7 @@ const Auth = {
 
     handleLogout() {
         AppState.setUser(null);
-        
+
         const authSection = document.getElementById('auth-section');
         const appContent = document.getElementById('app-content');
         const weatherWidget = document.getElementById('weather-widget');
@@ -189,7 +189,7 @@ const Auth = {
         if (weatherWidget) weatherWidget.style.display = 'none';
         if (usernameDisplay) usernameDisplay.textContent = '未登入';
         if (logoutBtn) logoutBtn.style.display = 'none';
-        
+
         Toast.info('已登出');
     },
 
@@ -219,7 +219,7 @@ const Weather = {
             console.warn('⚠️ city-select 元素不存在');
             return;
         }
-        
+
         const city = citySelect.value;
 
         try {
@@ -286,6 +286,18 @@ const Navigation = {
             case 'recommendation':
                 // Recommendation page 在 recommendation.js 中處理
                 break;
+            case 'profile':
+                // ✅ Oreoooooo Fix: 強制重新載入 iframe 內的個人資料
+                const iframe = document.querySelector('#profile-page iframe');
+                if (iframe && iframe.contentWindow && iframe.contentWindow.ProfileUI) {
+                    console.log('🔄 切換到個人設定，強制重新載入...');
+                    iframe.contentWindow.ProfileUI.loadProfile();
+                } else if (iframe) {
+                    // 如果 ProfileUI 還沒準備好，嘗試重新載入整個 iframe
+                    console.log('🔄 ProfileUI 未就緒，重整 iframe...');
+                    iframe.src = iframe.src;
+                }
+                break;
         }
     }
 };
@@ -326,10 +338,10 @@ if (citySelect) {
 // ========== 應用初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[初始化] 應用開始加載...');
-    
+
     // ✅ 檢查是否在 iframe 中（profile.html）
     const isInIframe = window.self !== window.top;
-    
+
     if (isInIframe) {
         console.log('[初始化] ✅ 在 iframe 中，只初始化 ProfileUI');
         // 延遲初始化以確保主頁的全局變數已加載
@@ -341,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
         return; // 不執行主頁初始化
     }
-    
+
     try {
         console.log('[初始化] 在主頁中，執行完整初始化...');
         Auth.init();
@@ -365,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('[初始化] AnchorItemUI...');
             AnchorItemUI.init();
         }
-        
+
         console.log('[初始化] ✅ 應用加載完成');
     } catch (error) {
         console.error('[初始化] ❌ 應用初始化失敗:', error);
