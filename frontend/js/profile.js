@@ -76,39 +76,84 @@ window.ProfileUI = {
     },
 
     async loadProfile() {
-        const user = AppState.getUser();
-        if (!user) {
-            alert('未登入，請先登入');
+        if (typeof AppState === 'undefined') {
+            console.warn('⚠️ AppState 未定義，無法載入個人資料');
             return;
         }
 
-        this.currentUser = user;
+        let user = AppState.getUser(); // Use a local variable for the initial check
+        if (!user) {
+            console.warn('⚠️ loadProfile: AppState.getUser() 回傳 null, 無法載入');
+            // 嘗試重新讀取一次 user
+            this.currentUser = AppState.getUser();
+            if (!this.currentUser) {
+                // 如果還是沒有，可能是 iframe 緩存了舊狀態，嘗試強制從 localStorage 讀取
+                const stored = localStorage.getItem('user');
+                if (stored) {
+                    this.currentUser = JSON.parse(stored);
+                    AppState.user = this.currentUser; // 同步回 AppState
+                    console.log('✅ loadProfile: 強制從 localStorage 修復 user');
+                } else {
+                    alert('未登入，請先登入');
+                    return;
+                }
+            }
+        } else {
+            this.currentUser = user;
+        }
+
+        const userId = this.currentUser.id;
+        console.log('🚀 [Debug] 開始載入個人資料, UserID:', userId);
 
         try {
-            const result = await API.getProfile(user.id);
+            const result = await API.getProfile(this.currentUser.id); // Use this.currentUser.id here
+            console.log('📦 [Debug] API 回傳結果:', result);
 
             if (result.success && result.profile) {
                 const profile = result.profile;
+                console.log('📄 [Debug] Profile 資料內容:', profile);
+
+                // Debug DOM elements status
+                console.log('🔍 [Debug]檢查 DOM 元素:');
+                console.log(`- Gender Select: ${this.genderSelect ? '✅ 存在' : '❌ 遺失'}`);
+                console.log(`- Height Input: ${this.heightInput ? '✅ 存在' : '❌ 遺失'}`);
+                console.log(`- Weight Input: ${this.weightInput ? '✅ 存在' : '❌ 遺失'}`);
+                console.log(`- Dislikes Textarea: ${this.dislikesTextarea ? '✅ 存在' : '❌ 遺失'}`);
+                console.log(`- Custom Desc Textarea: ${this.customDescTextarea ? '✅ 存在' : '❌ 遺失'}`);
 
                 // 填充表單
-                this.genderSelect.value = profile.gender || '';
-                this.heightInput.value = profile.height || '';
-                this.weightInput.value = profile.weight || '';
-                this.dislikesTextarea.value = profile.dislikes || '';
-                this.customDescTextarea.value = profile.custom_style_desc || '';
+                if (this.genderSelect) this.genderSelect.value = profile.gender || '';
+                if (this.heightInput) {
+                    console.log(`✏️ [Debug] 寫入身高: ${profile.height}`);
+                    this.heightInput.value = profile.height || '';
+                }
+                if (this.weightInput) {
+                    console.log(`✏️ [Debug] 寫入體重: ${profile.weight}`);
+                    this.weightInput.value = profile.weight || '';
+                }
+                if (this.dislikesTextarea) this.dislikesTextarea.value = profile.dislikes || '';
+                if (this.customDescTextarea) this.customDescTextarea.value = profile.custom_style_desc || '';
 
                 // 設定體感偏好
                 const thermalValue = profile.thermal_preference || 'normal';
-                document.querySelector(`input[name="thermal"][value="${thermalValue}"]`).checked = true;
+                const thermalRadio = document.querySelector(`input[name="thermal"][value="${thermalValue}"]`);
+                if (thermalRadio) {
+                    thermalRadio.checked = true;
+                } else {
+                    console.warn(`⚠️ [Debug] 找不到體感選項: ${thermalValue}`);
+                }
 
                 // 載入喜好風格
                 this.favoriteStyles = profile.favorite_styles || [];
+                console.log(`🎨 [Debug] 喜好風格: ${this.favoriteStyles.join(', ')}`);
                 this.renderFavoriteStyles();
 
-                console.log('✅ 個人資料已載入');
+                console.log('✅ [Debug] 個人資料載入流程完成');
+            } else {
+                console.warn('⚠️ [Debug] API 回傳成功但無 profile 資料', result);
             }
         } catch (error) {
-            console.error('載入個人資料失敗:', error);
+            console.error('❌ [Debug] 載入個人資料發生錯誤:', error);
         }
     },
 
