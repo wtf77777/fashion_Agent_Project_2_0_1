@@ -316,7 +316,10 @@ const ScrollToTop = {
 const citySelect = document.getElementById('city-select');
 if (citySelect) {
     citySelect.addEventListener('change', () => {
-        if (typeof Weather !== 'undefined') Weather.loadWeather();
+        // 檢查是否在 iframe 中
+        if (window.self === window.top && typeof Weather !== 'undefined') {
+            Weather.loadWeather();
+        }
     });
 }
 
@@ -324,7 +327,23 @@ if (citySelect) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[初始化] 應用開始加載...');
     
+    // ✅ 檢查是否在 iframe 中（profile.html）
+    const isInIframe = window.self !== window.top;
+    
+    if (isInIframe) {
+        console.log('[初始化] ✅ 在 iframe 中，只初始化 ProfileUI');
+        // 延遲初始化以確保主頁的全局變數已加載
+        setTimeout(() => {
+            if (typeof ProfileUI !== 'undefined') {
+                console.log('[初始化] ProfileUI 初始化中...');
+                ProfileUI.init();
+            }
+        }, 100);
+        return; // 不執行主頁初始化
+    }
+    
     try {
+        console.log('[初始化] 在主頁中，執行完整初始化...');
         Auth.init();
         Navigation.init();
         ScrollToTop.init();
@@ -350,7 +369,12 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('[初始化] ✅ 應用加載完成');
     } catch (error) {
         console.error('[初始化] ❌ 應用初始化失敗:', error);
-        Toast.error('應用初始化失敗，請重新整理頁面');
+        const toast = document.getElementById('toast');
+        if (toast) {
+            Toast.error('應用初始化失敗，請重新整理頁面');
+        } else {
+            alert('應用初始化失敗，請重新整理頁面');
+        }
     }
 });
 

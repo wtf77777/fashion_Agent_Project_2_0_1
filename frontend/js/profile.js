@@ -23,6 +23,14 @@ const ProfileUI = {
     currentUser: null,
 
     init() {
+        // ✅ 檢查是否在 profile.html (iframe) 中
+        if (typeof AppState === 'undefined') {
+            console.warn('⚠️ ProfileUI 檢測到在 iframe 環境中，延遲初始化...');
+            // 延遲初始化，等待主頁的全局變數加載完成
+            setTimeout(() => this.init(), 500);
+            return;
+        }
+        
         this.cacheDOM();
         this.bindEvents();
         this.loadProfile();
@@ -84,6 +92,11 @@ const ProfileUI = {
     },
 
     async loadProfile() {
+        if (typeof AppState === 'undefined') {
+            console.warn('⚠️ AppState 未定義，無法載入個人資料');
+            return;
+        }
+        
         const user = AppState.getUser();
         if (!user) {
             alert('未登入，請先登入');
@@ -167,6 +180,11 @@ const ProfileUI = {
     },
 
     removeStyle(style) {
+        if (typeof AppState === 'undefined' || typeof Toast === 'undefined') {
+            alert('⚠️ 應用未加載完全，請稍後重試');
+            return;
+        }
+        
         this.favoriteStyles = this.favoriteStyles.filter(s => s !== style);
         this.renderFavoriteStyles();
     },
@@ -207,6 +225,11 @@ const ProfileUI = {
                 Toast.error('❌ 儲存失敗: ' + result.message);
             }
         } catch (error) {
+        if (typeof AppState === 'undefined' || typeof Toast === 'undefined') {
+            alert('⚠️ 應用未加載完全，請稍後重試');
+            return;
+        }
+        
             Toast.error('❌ 儲存失敗: ' + error.message);
         }
     },
@@ -242,6 +265,11 @@ const ProfileUI = {
             );
 
             if (result.success) {
+        if (typeof AppState === 'undefined') {
+            console.warn('⚠️ AppState 未定義');
+            return;
+        }
+        
                 Toast.success('✅ 偏好設定已儲存');
             } else {
                 Toast.error('❌ 儲存失敗: ' + result.message);
@@ -293,6 +321,11 @@ const ProfileUI = {
                 this.historyList.innerHTML = `<div class="empty-state"><p>暫無推薦記錄</p></div>`;
             }
         } catch (error) {
+        if (typeof AppState === 'undefined') {
+            alert('⚠️ 應用未加載完全');
+            return;
+        }
+
             console.error('載入歷史失敗:', error);
             this.historyList.innerHTML = `<div class="empty-state"><p>載入失敗</p></div>`;
         }
@@ -322,9 +355,24 @@ const ProfileUI = {
 };
 
 // ========== 初始化 ==========
-window.addEventListener('load', () => {
-    // 延遲初始化以確保 AppState 已定義
-    if (typeof ProfileUI !== 'undefined' && typeof AppState !== 'undefined') {
-        ProfileUI.init();
-    }
+document.addEventListener('load', () => {
+    // ✅ 延遲初始化，確保所有全局變數已定義
+    setTimeout(() => {
+        if (typeof ProfileUI !== 'undefined') {
+            console.log('[ProfileUI] 開始初始化...');
+            ProfileUI.init();
+        } else {
+            console.warn('⚠️ ProfileUI 未定義');
+        }
+    }, 200);
+});
+
+// 備用：若 window.load 沒有觸發，嘗試 DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (typeof ProfileUI !== 'undefined' && !ProfileUI.currentUser) {
+            console.log('[ProfileUI] DOMContentLoaded 中初始化...');
+            ProfileUI.init();
+        }
+    }, 300);
 });
