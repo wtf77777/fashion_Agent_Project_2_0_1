@@ -1,0 +1,210 @@
+
+/* ========== 推薦頁面樣式 - 智能版 ========== */
+
+/* 推薦表單 */
+.recommendation-form {
+    background: white;
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.vibe-box {
+    background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+    padding: 20px;
+    border-radius: 15px;
+    border-left: 5px solid var(--primary-color);
+    margin-bottom: 25px;
+    font-size: 1.1rem;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.recommendation-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    justify-content: center;
+    overflow-x: auto;
+    padding-bottom: 10px;
+}
+
+.tab-btn {
+    padding: 12px 24px;
+    border: 2px solid #eee;
+    background: white;
+    border-radius: 30px;
+    color: var(--gray-600);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.tab-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+}
+
+/* 輪播容器 */
+.carousel-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: 20px;
+}
+
+.carousel-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.carousel-indicator {
+    text-align: center;
+    color: var(--primary-color);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* 輪播項目 */
+.recommended-item {
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid #f0f0f0;
+}
+
+.recommended-item-image {
+    width: 100%;
+    height: 400px;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.recommended-item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply; /* 若有白色背景可融合 */
+}
+
+.recommended-item-info {
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.recommended-item-info h3 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: var(--gray-800);
+}
+
+.item-tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.tag {
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    background: #f0f2f5;
+    color: #4b5563;
+}
+
+.tag.color { border-bottom: 3px solid #636e72; }
+.tag.style { border-bottom: 3px solid #00b894; }
+.tag.warmth { border-bottom: 3px solid #ff7675; }
+
+/* 推薦理由 */
+.outfit-reasons {
+    margin-top: 30px;
+    padding: 25px;
+    background: #fffafa;
+    border-radius: 15px;
+    border: 1px dashed #ff7675;
+}
+
+.outfit-reasons h4 {
+    color: #d63031;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.outfit-reasons ul {
+    list-style: none;
+    padding: 0;
+}
+
+.outfit-reasons li {
+    padding: 5px 0;
+    color: #4b5563;
+    position: relative;
+    padding-left: 20px;
+}
+
+.outfit-reasons li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #2ecc71;
+    font-weight: bold;
+}
+
+/* 輪播按鈕 */
+.carousel-btn {
+    width: 45px;
+    height: 45px;
+    border: none;
+    background: #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+    color: var(--gray-600);
+}
+
+.carousel-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: scale(1.1);
+}
+
+/* 動畫 */
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    .recommended-item {
+        grid-template-columns: 1fr;
+    }
+    .recommended-item-image {
+        height: 300px;
+    }
+}
