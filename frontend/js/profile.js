@@ -41,6 +41,14 @@ const ProfileUI = {
         this.dislikesTextarea = document.getElementById('dislikes');
         this.customDescTextarea = document.getElementById('custom-desc');
         this.historyList = document.getElementById('history-list');
+        
+        // ✅ 驗證關鍵元素是否存在
+        const missingElements = [];
+        if (!this.tabButtons || this.tabButtons.length === 0) missingElements.push('profile-tab-btn');
+        if (!this.tabPages || this.tabPages.length === 0) missingElements.push('tab-page');
+        if (missingElements.length > 0) {
+            console.warn('⚠️ 缺少必要的 DOM 元素:', missingElements.join(', '));
+        }
     },
 
     bindEvents() {

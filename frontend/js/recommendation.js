@@ -12,14 +12,20 @@ const RecommendationUI = {
 
     bindEvents() {
         // 獲取推薦按鈕
-        document.getElementById('get-recommendation-btn').addEventListener('click', () => {
-            this.handleGetRecommendation();
-        });
+        const getRecommendBtn = document.getElementById('get-recommendation-btn');
+        if (getRecommendBtn) {
+            getRecommendBtn.addEventListener('click', () => {
+                this.handleGetRecommendation();
+            });
+        }
 
         // 城市選擇變更時更新天氣
-        document.getElementById('city-select').addEventListener('change', () => {
-            if (typeof Weather !== 'undefined') Weather.loadWeather();
-        });
+        const citySelect = document.getElementById('city-select');
+        if (citySelect) {
+            citySelect.addEventListener('change', () => {
+                if (typeof Weather !== 'undefined') Weather.loadWeather();
+            });
+        }
     },
 
     async handleGetRecommendation() {
@@ -59,6 +65,12 @@ const RecommendationUI = {
         const resultContainer = document.getElementById('recommendation-result');
         const textContainer = document.getElementById('recommendation-text');
 
+        if (!resultContainer || !textContainer) {
+            console.warn('⚠️ 推薦結果容器不存在');
+            if (typeof Toast !== 'undefined') Toast.error('頁面元素加載失敗');
+            return;
+        }
+
         // 1. 顯示主容器
         resultContainer.style.display = 'block';
 
@@ -74,6 +86,12 @@ const RecommendationUI = {
 
     renderRecommendationSets() {
         const container = document.getElementById('recommendation-items');
+        
+        if (!container) {
+            console.warn('⚠️ recommendation-items 容器不存在');
+            return;
+        }
+        
         const sets = this.aiResult.recommendations; // 這是 [ 套裝1, 套裝2, 套裝3 ]
 
         if (!sets || sets.length === 0) {
