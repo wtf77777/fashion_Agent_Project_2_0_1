@@ -4,6 +4,7 @@ AI 服務層 - Oreoooooo 終極穩定整合版
 """
 import json
 import time
+import re
 import google.generativeai as genai
 from typing import List, Dict, Optional, Tuple, Tuple
 from database.models import ClothingItem, WeatherData
@@ -173,6 +174,52 @@ class AIService:
         except:
             return None
 
+    def _extract_response_text(self, response) -> str:
+        """安全取得 Gemini 回傳文字內容"""
+        if response is None:
+            return ""
+
+        try:
+            raw_text = response.text
+            if raw_text:
+                return str(raw_text)
+        except ValueError:
+            pass
+        except Exception:
+            pass
+
+        try:
+            if response.candidates and response.candidates[0].content.parts:
+                return str(response.candidates[0].content.parts[0].text or "")
+        except Exception:
+            return ""
+
+        return ""
+
+    def _safe_json_loads(self, text: str):
+        """嘗試解析 JSON，失敗時再抽取最可能的 JSON 區塊"""
+        if not text:
+            return None
+
+        cleaned = text.strip().replace('```json', '').replace('```', '').strip()
+        if not cleaned:
+            return None
+
+        try:
+            return json.loads(cleaned)
+        except Exception:
+            pass
+
+        # 嘗試抓出第一段 JSON 物件或陣列
+        match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', cleaned)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except Exception:
+                return None
+
+        return None
+
     def generate_outfit_recommendation(
         self, wardrobe: List[ClothingItem], weather: WeatherData, style: str, occasion: str,
         user_profile: Optional[Dict] = None,
@@ -181,6 +228,13 @@ class AIService:
         """產出智能穿搭組合 - 含完整解析與 Gemini 結語、支援個人偏好 & 指定單品"""
         try:
             self._rate_limit_wait()
+
+            locked_item_ids = list(locked_items) if locked_items else []
+            locked_item_ids_set = set(locked_item_ids)
+            locked_item_ids_str = set(str(x) for x in locked_item_ids)
+
+            def is_locked(item_id) -> bool:
+                return item_id in locked_item_ids_set or str(item_id) in locked_item_ids_str
             
             # ✅ 解析個人資料
             dislikes = ""
@@ -206,7 +260,7 @@ class AIService:
             # ✅ 優先級 3：處理指定單品
             locked_item_details = ""
             if locked_items:
-                locked_wardrobe = [item for item in wardrobe if item.id in locked_items]
+                locked_wardrobe = [item for item in wardrobe if is_locked(item.id)]
                 if locked_wardrobe:
                     locked_desc = "、".join([f"{item.name}({item.color})" for item in locked_wardrobe])
                     locked_item_details = f"\n【指定今日單品】必須包含: {locked_desc}"
@@ -233,27 +287,40 @@ class AIService:
             }}
             """
             res = self.model_t1.generate_content(analysis_prompt)
-            analysis = json.loads(res.text.strip().replace('```json','').replace('```',''))
-            
+            analysis_text = self._extract_response_text(res)
+            analysis = self._safe_json_loads(analysis_text)
+
+            if not isinstance(analysis, dict):
+                print("[AI] ⚠️ 場景解析回傳非 JSON，改用預設解析值")
+                analysis = {
+                    "normalized_occasion": "日常",
+                    "needs_outer": weather.temp < 22,
+                    "vibe_description": "今天就走舒適俐落的日常穿搭風格。",
+                    "parsed_style": style or "日常"
+                }
+
             # ✅ 根據體感偏好調整保暖需求
-            needs_outer = analysis["needs_outer"]
+            needs_outer = bool(analysis.get("needs_outer", weather.temp < 22))
             if thermal_preference == "cold_sensitive" and weather.temp < 24:
                 needs_outer = True  # 強制加外套
             elif thermal_preference == "heat_sensitive" and weather.temp > 25:
                 needs_outer = False  # 儘量不穿外套
+
+            normalized_occasion = analysis.get("normalized_occasion") or "日常"
+            parsed_style = analysis.get("parsed_style") or style or "日常"
             
             # 2. 引擎從真實衣櫥挑選 - 實現軟扣分機制（推薦 3 套時追蹤已使用單品）
             engine = RecommendationEngine()
             outfits = []
             # ✅ 優先級 3 修復：初始化 used_items 為空，但稍後會加入 locked_items
-            used_items = locked_item_ids if locked_items else []  # 初始化為指定單品（必須包含）
+            used_items = list(locked_item_ids)  # 初始化為指定單品（必須包含）
             
             for set_idx in range(3):
                 try:
                     # 在每一套時傳入已使用單品，實現軟扣分
                     single_outfit = engine.recommend(
-                        wardrobe, weather, analysis["normalized_occasion"], "中性", 
-                        analysis["parsed_style"], needs_outer, used_items=used_items
+                        wardrobe, weather, normalized_occasion, "中性", 
+                        parsed_style, needs_outer, used_items=used_items
                     )
                     
                     if single_outfit:
@@ -262,7 +329,7 @@ class AIService:
                         # ✅ 提取該套中的單品 ID 加入 used_items（不包括指定單品，防止後續套裝排除它們）
                         if single_outfit[0].get('items'):
                             for item in single_outfit[0]['items']:
-                                if item.get('id') and item['id'] not in locked_item_ids:
+                                if item.get('id') and not is_locked(item['id']):
                                     # 只追蹤非指定的單品，指定單品應在每套中重複出現
                                     used_items.append(item['id'])
                 except Exception as e:
@@ -327,7 +394,7 @@ class AIService:
             reason_res = self.model_t1.generate_content(detail_prompt)
             
             return {
-                "vibe": analysis["vibe_description"],
+                "vibe": analysis.get("vibe_description") or "今天就走舒適俐落的日常穿搭風格。",
                 "detailed_reasons": reason_res.text,
                 "recommendations": outfits
             }
