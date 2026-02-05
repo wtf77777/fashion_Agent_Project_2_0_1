@@ -289,13 +289,15 @@ const Navigation = {
             case 'profile':
                 // ✅ Oreoooooo Fix: 強制重新載入 iframe 內的個人資料
                 const iframe = document.querySelector('#profile-page iframe');
-                if (iframe && iframe.contentWindow && iframe.contentWindow.ProfileUI) {
-                    console.log('🔄 切換到個人設定，強制重新載入...');
-                    iframe.contentWindow.ProfileUI.loadProfile();
-                } else if (iframe) {
-                    // 如果 ProfileUI 還沒準備好，嘗試重新載入整個 iframe
-                    console.log('🔄 ProfileUI 未就緒，重整 iframe...');
-                    iframe.src = iframe.src;
+                if (iframe && iframe.contentWindow) {
+                    if (iframe.contentWindow.ProfileUI) {
+                        console.log('🔄 [App] 呼叫 ProfileUI.loadProfile()...');
+                        iframe.contentWindow.ProfileUI.loadProfile();
+                    } else {
+                        console.log('🔄 [App] ProfileUI 未就緒，強制刷新 iframe...');
+                        // 使用 location.reload 來確保完全重整
+                        iframe.contentWindow.location.reload();
+                    }
                 }
                 break;
         }

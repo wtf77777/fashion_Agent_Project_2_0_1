@@ -18,7 +18,7 @@ const STYLE_DEFINITIONS = {
 };
 
 // ========== 個人設定 UI 邏輯 ==========
-const ProfileUI = {
+window.ProfileUI = {
     favoriteStyles: [],
     currentUser: null,
 
@@ -30,7 +30,7 @@ const ProfileUI = {
             setTimeout(() => this.init(), 500);
             return;
         }
-        
+
         this.cacheDOM();
         this.bindEvents();
         this.loadProfile();
@@ -49,7 +49,7 @@ const ProfileUI = {
         this.dislikesTextarea = document.getElementById('dislikes');
         this.customDescTextarea = document.getElementById('custom-desc');
         this.historyList = document.getElementById('history-list');
-        
+
         // ✅ 驗證關鍵元素是否存在
         const missingElements = [];
         if (!this.tabButtons || this.tabButtons.length === 0) missingElements.push('profile-tab-btn');
@@ -96,36 +96,52 @@ const ProfileUI = {
             console.warn('⚠️ AppState 未定義，無法載入個人資料');
             return;
         }
-        
+
         const user = AppState.getUser();
         if (!user) {
-            alert('未登入，請先登入');
-            return;
+            console.warn('⚠️ loadProfile: AppState.getUser() 回傳 null, 無法載入');
+            // 嘗試重新讀取一次 user
+            this.currentUser = AppState.getUser();
+            if (!this.currentUser) {
+                // 如果還是沒有，可能是 iframe 緩存了舊狀態，嘗試強制從 localStorage 讀取
+                const stored = localStorage.getItem('user');
+                if (stored) {
+                    this.currentUser = JSON.parse(stored);
+                    AppState.user = this.currentUser; // 同步回 AppState
+                    console.log('✅ loadProfile: 強制從 localStorage 修復 user');
+                } else {
+                    alert('未登入，請先登入');
+                    return;
+                }
+            }
+        } else {
+            this.currentUser = user;
         }
 
-        this.currentUser = user;
+        const userId = this.currentUser.id;
+        console.log('🚀 開始載入個人資料, UserID:', userId);
 
         try {
             const result = await API.getProfile(user.id);
-            
+
             if (result.success && result.profile) {
                 const profile = result.profile;
-                
+
                 // 填充表單
                 this.genderSelect.value = profile.gender || '';
                 this.heightInput.value = profile.height || '';
                 this.weightInput.value = profile.weight || '';
                 this.dislikesTextarea.value = profile.dislikes || '';
                 this.customDescTextarea.value = profile.custom_style_desc || '';
-                
+
                 // 設定體感偏好
                 const thermalValue = profile.thermal_preference || 'normal';
                 document.querySelector(`input[name="thermal"][value="${thermalValue}"]`).checked = true;
-                
+
                 // 載入喜好風格
                 this.favoriteStyles = profile.favorite_styles || [];
                 this.renderFavoriteStyles();
-                
+
                 console.log('✅ 個人資料已載入');
             }
         } catch (error) {
@@ -162,7 +178,7 @@ const ProfileUI = {
 
     renderFavoriteStyles() {
         this.favoriteStylesList.innerHTML = '';
-        
+
         if (this.favoriteStyles.length === 0) {
             this.favoriteStylesList.innerHTML = '<div style="color: #999; font-size: 12px;">未選擇任何風格</div>';
             return;
@@ -184,7 +200,7 @@ const ProfileUI = {
             alert('⚠️ 應用未加載完全，請稍後重試');
             return;
         }
-        
+
         this.favoriteStyles = this.favoriteStyles.filter(s => s !== style);
         this.renderFavoriteStyles();
     },
@@ -225,11 +241,11 @@ const ProfileUI = {
                 Toast.error('❌ 儲存失敗: ' + result.message);
             }
         } catch (error) {
-        if (typeof AppState === 'undefined' || typeof Toast === 'undefined') {
-            alert('⚠️ 應用未加載完全，請稍後重試');
-            return;
-        }
-        
+            if (typeof AppState === 'undefined' || typeof Toast === 'undefined') {
+                alert('⚠️ 應用未加載完全，請稍後重試');
+                return;
+            }
+
             Toast.error('❌ 儲存失敗: ' + error.message);
         }
     },
@@ -265,11 +281,11 @@ const ProfileUI = {
             );
 
             if (result.success) {
-        if (typeof AppState === 'undefined') {
-            console.warn('⚠️ AppState 未定義');
-            return;
-        }
-        
+                if (typeof AppState === 'undefined') {
+                    console.warn('⚠️ AppState 未定義');
+                    return;
+                }
+
                 Toast.success('✅ 偏好設定已儲存');
             } else {
                 Toast.error('❌ 儲存失敗: ' + result.message);
@@ -321,10 +337,10 @@ const ProfileUI = {
                 this.historyList.innerHTML = `<div class="empty-state"><p>暫無推薦記錄</p></div>`;
             }
         } catch (error) {
-        if (typeof AppState === 'undefined') {
-            alert('⚠️ 應用未加載完全');
-            return;
-        }
+            if (typeof AppState === 'undefined') {
+                alert('⚠️ 應用未加載完全');
+                return;
+            }
 
             console.error('載入歷史失敗:', error);
             this.historyList.innerHTML = `<div class="empty-state"><p>載入失敗</p></div>`;
