@@ -287,17 +287,8 @@ const Navigation = {
                 // Recommendation page 在 recommendation.js 中處理
                 break;
             case 'profile':
-                // ✅ Oreoooooo Fix: 強制重新載入 iframe 內的個人資料
-                const iframe = document.querySelector('#profile-page iframe');
-                if (iframe && iframe.contentWindow) {
-                    if (iframe.contentWindow.ProfileUI) {
-                        console.log('🔄 [App] 呼叫 ProfileUI.loadProfile()...');
-                        iframe.contentWindow.ProfileUI.loadProfile();
-                    } else {
-                        console.log('🔄 [App] ProfileUI 未就緒，強制刷新 iframe...');
-                        // 使用 location.reload 來確保完全重整
-                        iframe.contentWindow.location.reload();
-                    }
+                if (typeof ProfileUI !== 'undefined') {
+                    ProfileUI.loadProfile();
                 }
                 break;
         }
@@ -341,43 +332,31 @@ if (citySelect) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[初始化] 應用開始加載...');
 
-    // ✅ 檢查是否在 iframe 中（profile.html）
-    const isInIframe = window.self !== window.top;
-
-    if (isInIframe) {
-        console.log('[初始化] ✅ 在 iframe 中，只初始化 ProfileUI');
-        // 延遲初始化以確保主頁的全局變數已加載
-        setTimeout(() => {
-            if (typeof ProfileUI !== 'undefined') {
-                console.log('[初始化] ProfileUI 初始化中...');
-                ProfileUI.init();
-            }
-        }, 100);
-        return; // 不執行主頁初始化
-    }
+    // ✅ 檢查是否在 iframe 中（已棄用，因為改為 SPA）
+    // const isInIframe = window.self !== window.top;
 
     try {
-        console.log('[初始化] 在主頁中，執行完整初始化...');
+        console.log('[初始化] 應用開始加載...');
         Auth.init();
         Navigation.init();
         ScrollToTop.init();
 
         // 初始化各個模組
         if (typeof UploadUI !== 'undefined') {
-            console.log('[初始化] UploadUI...');
             UploadUI.init();
         }
         if (typeof WardrobeUI !== 'undefined') {
-            console.log('[初始化] WardrobeUI...');
             WardrobeUI.init();
         }
         if (typeof RecommendationUI !== 'undefined') {
-            console.log('[初始化] RecommendationUI...');
             RecommendationUI.init();
         }
         if (typeof AnchorItemUI !== 'undefined') {
-            console.log('[初始化] AnchorItemUI...');
             AnchorItemUI.init();
+        }
+        if (typeof ProfileUI !== 'undefined') {
+            console.log('[初始化] ProfileUI...');
+            ProfileUI.init();
         }
 
         console.log('[初始化] ✅ 應用加載完成');
