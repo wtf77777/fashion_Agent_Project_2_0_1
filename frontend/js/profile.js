@@ -23,14 +23,6 @@ window.ProfileUI = {
     currentUser: null,
 
     init() {
-        // ✅ 檢查是否在 profile.html (iframe) 中
-        if (typeof AppState === 'undefined') {
-            console.warn('⚠️ ProfileUI 檢測到在 iframe 環境中，延遲初始化...');
-            // 延遲初始化，等待主頁的全局變數加載完成
-            setTimeout(() => this.init(), 500);
-            return;
-        }
-
         this.cacheDOM();
         this.bindEvents();
         this.loadProfile();
@@ -49,14 +41,6 @@ window.ProfileUI = {
         this.dislikesTextarea = document.getElementById('dislikes');
         this.customDescTextarea = document.getElementById('custom-desc');
         this.historyList = document.getElementById('history-list');
-
-        // ✅ 驗證關鍵元素是否存在
-        const missingElements = [];
-        if (!this.tabButtons || this.tabButtons.length === 0) missingElements.push('profile-tab-btn');
-        if (!this.tabPages || this.tabPages.length === 0) missingElements.push('tab-page');
-        if (missingElements.length > 0) {
-            console.warn('⚠️ 缺少必要的 DOM 元素:', missingElements.join(', '));
-        }
     },
 
     bindEvents() {
@@ -92,34 +76,13 @@ window.ProfileUI = {
     },
 
     async loadProfile() {
-        if (typeof AppState === 'undefined') {
-            console.warn('⚠️ AppState 未定義，無法載入個人資料');
+        const user = AppState.getUser();
+        if (!user) {
+            alert('未登入，請先登入');
             return;
         }
 
-        const user = AppState.getUser();
-        if (!user) {
-            console.warn('⚠️ loadProfile: AppState.getUser() 回傳 null, 無法載入');
-            // 嘗試重新讀取一次 user
-            this.currentUser = AppState.getUser();
-            if (!this.currentUser) {
-                // 如果還是沒有，可能是 iframe 緩存了舊狀態，嘗試強制從 localStorage 讀取
-                const stored = localStorage.getItem('user');
-                if (stored) {
-                    this.currentUser = JSON.parse(stored);
-                    AppState.user = this.currentUser; // 同步回 AppState
-                    console.log('✅ loadProfile: 強制從 localStorage 修復 user');
-                } else {
-                    alert('未登入，請先登入');
-                    return;
-                }
-            }
-        } else {
-            this.currentUser = user;
-        }
-
-        const userId = this.currentUser.id;
-        console.log('🚀 開始載入個人資料, UserID:', userId);
+        this.currentUser = user;
 
         try {
             const result = await API.getProfile(user.id);
@@ -196,11 +159,6 @@ window.ProfileUI = {
     },
 
     removeStyle(style) {
-        if (typeof AppState === 'undefined' || typeof Toast === 'undefined') {
-            alert('⚠️ 應用未加載完全，請稍後重試');
-            return;
-        }
-
         this.favoriteStyles = this.favoriteStyles.filter(s => s !== style);
         this.renderFavoriteStyles();
     },
@@ -209,26 +167,12 @@ window.ProfileUI = {
         const user = AppState.getUser();
         if (!user) return;
 
-        // ✅ 驗證身高和體重
-        const height = this.heightInput.value;
-        const weight = this.weightInput.value;
-
-        if (height && (isNaN(height) || parseInt(height) < 140 || parseInt(height) > 220)) {
-            Toast.error('❌ 身高必須在 140-220 cm 之間');
-            return;
-        }
-
-        if (weight && (isNaN(weight) || parseInt(weight) < 30 || parseInt(weight) > 150)) {
-            Toast.error('❌ 體重必須在 30-150 kg 之間');
-            return;
-        }
-
         try {
             const result = await API.updateProfile(
                 user.id,
                 this.genderSelect.value,
-                height,
-                weight,
+                this.heightInput.value,
+                this.weightInput.value,
                 null,
                 null,
                 document.querySelector('input[name="thermal"]:checked').value,
@@ -236,37 +180,18 @@ window.ProfileUI = {
             );
 
             if (result.success) {
-                Toast.success('✅ 個人資料已儲存');
+                alert('✅ 個人資料已儲存');
             } else {
-                Toast.error('❌ 儲存失敗: ' + result.message);
+                alert('❌ 儲存失敗: ' + result.message);
             }
         } catch (error) {
-            if (typeof AppState === 'undefined' || typeof Toast === 'undefined') {
-                alert('⚠️ 應用未加載完全，請稍後重試');
-                return;
-            }
-
-            Toast.error('❌ 儲存失敗: ' + error.message);
+            alert('❌ 儲存失敗: ' + error.message);
         }
     },
 
     async savePreferences() {
         const user = AppState.getUser();
         if (!user) return;
-
-        // ✅ 驗證避雷清單和自訂描述長度
-        const dislikes = this.dislikesTextarea.value;
-        const customDesc = this.customDescTextarea.value;
-
-        if (dislikes.length > 500) {
-            Toast.error('❌ 避雷清單最多 500 字');
-            return;
-        }
-
-        if (customDesc.length > 500) {
-            Toast.error('❌ 自訂描述最多 500 字');
-            return;
-        }
 
         try {
             const result = await API.updateProfile(
@@ -275,23 +200,18 @@ window.ProfileUI = {
                 null,
                 null,
                 JSON.stringify(this.favoriteStyles),
-                dislikes,
+                this.dislikesTextarea.value,
                 null,
-                customDesc
+                this.customDescTextarea.value
             );
 
             if (result.success) {
-                if (typeof AppState === 'undefined') {
-                    console.warn('⚠️ AppState 未定義');
-                    return;
-                }
-
-                Toast.success('✅ 偏好設定已儲存');
+                alert('✅ 偏好設定已儲存');
             } else {
-                Toast.error('❌ 儲存失敗: ' + result.message);
+                alert('❌ 儲存失敗: ' + result.message);
             }
         } catch (error) {
-            Toast.error('❌ 儲存失敗: ' + error.message);
+            alert('❌ 儲存失敗: ' + error.message);
         }
     },
 
@@ -310,38 +230,21 @@ window.ProfileUI = {
 
                 this.historyList.innerHTML = '';
                 result.history.forEach((item, index) => {
-                    // ✅ 驗證日期有效性
-                    let dateStr = '未知時間';
-                    try {
-                        const dateObj = new Date(item.created_at);
-                        if (!isNaN(dateObj.getTime())) {
-                            dateStr = dateObj.toLocaleString('zh-TW');
-                        }
-                    } catch (e) {
-                        console.warn('日期解析失敗:', item.created_at);
-                    }
-
+                    const date = new Date(item.created_at).toLocaleString('zh-TW');
                     const historyHTML = `
                         <div class="history-item">
                             <div class="history-info">
-                                <strong>${index + 1}. ${item.city || '未知城市'} - ${item.occasion || '未知場合'}</strong>
-                                <div class="history-detail">風格: ${item.style || '未知'}</div>
-                                <div class="history-date">📅 ${dateStr}</div>
+                                <strong>${index + 1}. ${item.city} - ${item.occasion}</strong>
+                                <div class="history-detail">風格: ${item.style}</div>
+                                <div class="history-date">📅 ${date}</div>
                             </div>
                             <button class="history-button" onclick="ProfileUI.deleteHistory(${item.id})">刪除</button>
                         </div>
                     `;
                     this.historyList.innerHTML += historyHTML;
                 });
-            } else {
-                this.historyList.innerHTML = `<div class="empty-state"><p>暫無推薦記錄</p></div>`;
             }
         } catch (error) {
-            if (typeof AppState === 'undefined') {
-                alert('⚠️ 應用未加載完全');
-                return;
-            }
-
             console.error('載入歷史失敗:', error);
             this.historyList.innerHTML = `<div class="empty-state"><p>載入失敗</p></div>`;
         }
@@ -370,25 +273,67 @@ window.ProfileUI = {
     }
 };
 
-// ========== 初始化 ==========
-document.addEventListener('load', () => {
-    // ✅ 延遲初始化，確保所有全局變數已定義
-    setTimeout(() => {
-        if (typeof ProfileUI !== 'undefined') {
-            console.log('[ProfileUI] 開始初始化...');
-            ProfileUI.init();
-        } else {
-            console.warn('⚠️ ProfileUI 未定義');
-        }
-    }, 200);
-});
+// ========== API 擴充 (在 api.js 中新增) ==========
+// 以下方法應該新增到 API 物件中
 
-// 備用：若 window.load 沒有觸發，嘗試 DOMContentLoaded
+API.getProfile = async function (user_id) {
+    const response = await fetch(`${API_BASE_URL}/api/profile?user_id=${encodeURIComponent(user_id)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+};
+
+API.updateProfile = async function (
+    user_id,
+    gender,
+    height,
+    weight,
+    favorite_styles,
+    dislikes,
+    thermal_preference,
+    custom_style_desc
+) {
+    const formData = new FormData();
+    formData.append('user_id', user_id);
+    if (gender) formData.append('gender', gender);
+    if (height) formData.append('height', height);
+    if (weight) formData.append('weight', weight);
+    if (favorite_styles) formData.append('favorite_styles', favorite_styles);
+    if (dislikes) formData.append('dislikes', dislikes);
+    if (thermal_preference) formData.append('thermal_preference', thermal_preference);
+    if (custom_style_desc) formData.append('custom_style_desc', custom_style_desc);
+
+    const response = await fetch(`${API_BASE_URL}/api/profile`, {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+};
+
+API.getHistory = async function (user_id, limit = 20) {
+    const response = await fetch(
+        `${API_BASE_URL}/api/history?user_id=${encodeURIComponent(user_id)}&limit=${limit}`
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+};
+
+API.deleteHistory = async function (user_id, history_id) {
+    const formData = new FormData();
+    formData.append('user_id', user_id);
+    formData.append('history_id', history_id);
+
+    const response = await fetch(`${API_BASE_URL}/api/history/delete`, {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+};
+
+// ========== 初始化 ==========
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        if (typeof ProfileUI !== 'undefined' && !ProfileUI.currentUser) {
-            console.log('[ProfileUI] DOMContentLoaded 中初始化...');
-            ProfileUI.init();
-        }
-    }, 300);
+    ProfileUI.init();
 });
