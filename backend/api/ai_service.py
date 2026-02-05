@@ -191,12 +191,26 @@ class AIService:
                 thermal_preference = user_profile.get("thermal_preference", "normal") or "normal"
                 custom_desc = user_profile.get("custom_style_desc", "") or ""
             
-            # 1. 意圖解析
+            # 1. 意圖解析 - 增強提示詞融入個人資料
+            user_height = user_profile.get("height") if user_profile else None
+            user_weight = user_profile.get("weight") if user_profile else None
+            user_gender = user_profile.get("gender") if user_profile else "中性"
+            favorite_styles = user_profile.get("favorite_styles", []) if user_profile else []
+            
+            favorite_styles_str = "、".join(favorite_styles) if favorite_styles else "無特殊偏好"
+            
             analysis_prompt = f"""
-            使用者描述："{occasion}｜風格偏好：{style}"
-            天氣：{weather.temp}度 ({weather.desc})
-            體感偏好：{thermal_preference}
+            【使用者資料】
+            性別/身形: {user_gender} / {user_height}cm / {user_weight}kg (若有此資料，請在建議中考慮顯高/顯瘦)
+            習慣風格: {favorite_styles_str}
+            體感偏好：{thermal_preference} (若為'cold_sensitive'請增加保暖度權重)
             避雷清單：{dislikes if dislikes else '無'}
+            自訂備註：{custom_desc if custom_desc else '無'}
+            
+            【本次需求】
+            場合："{occasion}"
+            風格偏好：{style}
+            天氣：{weather.temp}度 ({weather.desc})
             
             請解析場景意圖與天氣影響。
             回傳 JSON: {{
@@ -244,8 +258,30 @@ class AIService:
                 
                 outfits = filtered_outfits[:3] if filtered_outfits else outfits[:3]
 
-            # 3. 針對具體衣服產出 80 字溫馨總結 (Gemini 結語)
-            detail_prompt = f"針對以下這 3 套從衣櫥挑出的方案，寫一段約 80 字的顧問話語給使用者，解釋這幾套為何適合今天({weather.temp}度)及{occasion}：\n"
+            # 3. 針對具體衣服產出 100 字溫馨總結 (Gemini 結語) - 融入身形修飾建議
+            body_shape_tip = ""
+            if user_height and user_weight:
+                # 簡單 BMI 計算幫助判斷修飾建議
+                bmi = user_weight / ((user_height / 100) ** 2)
+                if bmi < 18.5:
+                    body_shape_tip = "此使用者偏瘦，應選擇有蓬度/紋理的衣服來增加視覺豐盈感，避免過度貼身。"
+                elif bmi > 25:
+                    body_shape_tip = "此使用者偏重，應選擇直線條/深色/豎紋路的衣服來顯瘦，避免過度鬆散或橫紋。"
+                else:
+                    body_shape_tip = f"此使用者身材勻稱({user_height}cm/{user_weight}kg)，可選擇符合氣質的任何剪裁。"
+            
+            detail_prompt = f"""身為專業穿搭顧問，請針對以下這位使用者({user_gender}/{user_height}cm/{user_weight}kg)寫一段約 100 字的溫馨專業建議。
+
+{body_shape_tip}
+
+重點：
+1. 解釋為何這 3 套適合今天的天氣({weather.temp}度)與場合({occasion})
+2. 若使用者有體感偏好({thermal_preference})或避雷，提到你如何貼心考量
+3. 針對其身形給予修飾建議
+4. 根據其習慣風格({favorite_styles_str})評論搭配是否符合氣質
+
+方案詳情：
+"""
             for i, o in enumerate(outfits):
                 names = [f"{it['color']}{it['name']}" for it in o['items']]
                 detail_prompt += f"方案{i+1}: {', '.join(names)}\n"
