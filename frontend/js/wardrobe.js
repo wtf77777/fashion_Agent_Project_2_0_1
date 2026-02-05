@@ -234,7 +234,9 @@ const WardrobeUI = {
         card.className = 'wardrobe-item';
         card.dataset.itemId = item.id;
         // ✅ 點擊卡片觸發編輯 Modal (強制使用 WardrobeUI 引用)
-        card.onclick = () => WardrobeUI.openEditModal(item.id);
+        if (!this.isBatchDeleteMode) {
+            card.onclick = () => WardrobeUI.openEditModal(item.id);
+        }
 
 
         let checkboxHTML = '';
@@ -403,6 +405,10 @@ const WardrobeUI = {
 
     // ✅ Oreoooooo 新增: 編輯 Modal 控制
     openEditModal(itemId) {
+        if (this.isBatchDeleteMode) {
+            return;
+        }
+
         const item = this.items.find(i => i.id === itemId);
         if (!item) {
             console.error('找不到衣物 ID:', itemId);

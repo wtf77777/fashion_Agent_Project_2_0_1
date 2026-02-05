@@ -6,6 +6,34 @@ const RecommendationUI = {
     currentSetIndex: 0,      // 目前在第幾套推薦 (Set 1, 2, 3)
     currentItemIndex: 0,     // 目前在該套的第幾件單品 (Top, Bottom, Shoes...)
 
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    },
+
+    getReasonLines(currentSet) {
+        const setReasons = Array.isArray(currentSet?.reasons) ? currentSet.reasons.filter(Boolean) : [];
+        if (setReasons.length > 0) {
+            return setReasons;
+        }
+
+        return this.parseReasonText(this.aiResult?.detailed_reasons);
+    },
+
+    parseReasonText(text) {
+        if (!text || typeof text !== 'string') return [];
+        const cleaned = text.replace(/\r/g, '').trim();
+        if (!cleaned) return [];
+
+        const lines = cleaned
+            .split(/\n+/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+        return lines.length > 0 ? lines : [cleaned];
+    },
+
     init() {
         this.bindEvents();
     },
@@ -75,7 +103,8 @@ const RecommendationUI = {
         resultContainer.style.display = 'block';
 
         // 2. 顯示 AI 描述
-        textContainer.innerHTML = `<div class="vibe-box"><i class="fas fa-magic"></i> ${this.aiResult.vibe}</div>`;
+        const vibeText = this.escapeHtml(this.aiResult?.vibe || '');
+        textContainer.innerHTML = `<div class="vibe-box"><i class="fas fa-magic"></i> ${vibeText}</div>`;
 
         // 3. 渲染主推薦區塊 (包含 Tabs 和 Carousel)
         this.renderRecommendationSets();
@@ -122,6 +151,11 @@ const RecommendationUI = {
             shoppingHtml = `<div id="shopping-container-${this.currentSetIndex}-${this.currentItemIndex}"></div>`;
         }
 
+        const reasonLines = this.getReasonLines(currentSet);
+        const reasonsHtml = reasonLines.length > 0
+            ? reasonLines.map(r => `<li>${this.escapeHtml(r)}</li>`).join('')
+            : `<li>暫無推薦原因說明。</li>`;
+
         let carouselHtml = `
             <div class="carousel-container">
                 <button class="carousel-btn prev" onclick="RecommendationUI.prevItem()">◀</button>
@@ -142,7 +176,7 @@ const RecommendationUI = {
             <div class="outfit-reasons">
                 <h4>✨ 推薦原因</h4>
                 <ul>
-                    ${currentSet.reasons.map(r => `<li>${r}</li>`).join('')}
+                    ${reasonsHtml}
                 </ul>
             </div>
             ${shoppingHtml}
